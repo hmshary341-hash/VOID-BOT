@@ -284,6 +284,8 @@ async def قيف(ctx, time:int, winners:int, *, prize):
                     x.mention for x in winners_list
                 )
 )
+            else:
+    await ctx.send("❌ لا يوجد مشاركين")
 
 # =====================
 # الفعاليات + رتبة King Game
