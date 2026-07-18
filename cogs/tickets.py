@@ -1,10 +1,10 @@
 import discord
 from discord.ext import commands
 
-
 TICKET_CATEGORY = 1525952823156801576
 STAFF_ROLE = None  # حط ID رتبة الإدارة هنا
-
+# الرابط المباشر لشعار VOID البنفسجي اللي أرسلته
+TICKET_IMAGE_URL = "https://i.ibb.co/3mN68wM/VOID-Logo.png" 
 
 class TicketReason(discord.ui.Select):
     def __init__(self):
@@ -28,11 +28,8 @@ class TicketReason(discord.ui.Select):
             options=options
         )
 
-
     async def callback(self, interaction):
-
         reason = self.values[0]
-
         await interaction.response.send_modal(
             TicketModal(reason)
         )
@@ -45,7 +42,6 @@ class TicketMenu(discord.ui.View):
 
 
 class TicketModal(discord.ui.Modal):
-
     def __init__(self, reason):
         super().__init__(
             title="بيانات التكت"
@@ -73,21 +69,14 @@ class TicketModal(discord.ui.Modal):
         self.add_item(self.problem)
         self.add_item(self.proof)
 
-
     async def on_submit(self, interaction):
-
         guild = interaction.guild
-
-        category = guild.get_channel(
-            TICKET_CATEGORY
-        )
-
+        category = guild.get_channel(TICKET_CATEGORY)
 
         channel = await guild.create_text_channel(
             name=f"ticket-{interaction.user.name}",
             category=category
         )
-
 
         await channel.set_permissions(
             interaction.user,
@@ -95,38 +84,16 @@ class TicketModal(discord.ui.Modal):
             send_messages=True
         )
 
-
         embed = discord.Embed(
             title="🎫 تكت جديد",
             description="افتح تكت وإن شاء الله تنحل مشكلتك 🖤",
             color=0x8000FF
         )
 
-
-        embed.add_field(
-            name="النوع",
-            value=self.reason,
-            inline=False
-        )
-
-        embed.add_field(
-            name="العضو",
-            value=str(self.user),
-            inline=False
-        )
-
-        embed.add_field(
-            name="السبب",
-            value=str(self.problem),
-            inline=False
-        )
-
-        embed.add_field(
-            name="الدليل",
-            value=str(self.proof),
-            inline=False
-        )
-
+        embed.add_field(name="النوع", value=self.reason, inline=False)
+        embed.add_field(name="العضو", value=str(self.user), inline=False)
+        embed.add_field(name="السبب", value=str(self.problem), inline=False)
+        embed.add_field(name="الدليل", value=str(self.proof), inline=False)
 
         await channel.send(
             interaction.user.mention,
@@ -134,61 +101,49 @@ class TicketModal(discord.ui.Modal):
             view=TicketControl()
         )
 
-
         await interaction.response.send_message(
             f"✅ تم فتح التكت: {channel.mention}",
             ephemeral=True
         )
 
 
-
 class TicketControl(discord.ui.View):
-
     def __init__(self):
         super().__init__(timeout=None)
-
 
     @discord.ui.button(
         label="✅ استلام تكت",
         style=discord.ButtonStyle.success
     )
     async def claim(self, interaction, button):
-
         await interaction.response.send_message(
             f"✅ تم استلام التكت بواسطة {interaction.user.mention}"
         )
-
 
     @discord.ui.button(
         label="🔒 إغلاق تكت",
         style=discord.ButtonStyle.danger
     )
     async def close(self, interaction, button):
-
         await interaction.channel.delete()
 
 
-
 class Tickets(commands.Cog):
-
     def __init__(self, bot):
         self.bot = bot
-
 
     @commands.command()
     @commands.has_permissions(administrator=True)
     async def ارسل(self, ctx, arg=None):
-
         if arg == "تكت":
-
             embed = discord.Embed(
-                title="🎫 افتح تكت",
-                description=(
-                    "اضغط الزر لفتح تكت\n\n"
-                    "وإن شاء الله تنحل مشكلتك 🖤"
-                ),
+                title="🎫 نظام التذاكر",
+                description="**افتح تكت وإن شاء الله تنحل مشكلتك** 🖤",
                 color=0x8000FF
             )
+            
+            # عرض الصورة كبنر داخل الإمبيد الأساسي لفتح التكت
+            embed.set_image(url=TICKET_IMAGE_URL)
 
             await ctx.send(
                 embed=embed,
@@ -197,17 +152,14 @@ class Tickets(commands.Cog):
 
 
 class OpenTicket(discord.ui.View):
-
     def __init__(self):
         super().__init__(timeout=None)
-
 
     @discord.ui.button(
         label="🎫 افتح تكت",
         style=discord.ButtonStyle.primary
     )
     async def open(self, interaction, button):
-
         await interaction.response.send_message(
             "اختر سبب التكت:",
             view=TicketMenu(),
