@@ -29,6 +29,9 @@ TICKET_LOG = 1527750890952462408
 EVENT_CHANNEL = 1526824130391834644
 KING_GAME_ROLE = 1527871033665654824
 
+CHANNEL_ID = 1526823698089119784
+SEPARATOR_IMAGE = "https://files.catbox.moe/7q1g3v.png"
+
 
 # =====================
 # BOT
@@ -50,11 +53,12 @@ bot = commands.Bot(
 
 @bot.event
 async def on_ready():
+    bot.add_view(RulesButton())
     print(f"Logged in as {bot.user}")
 
 
 # =====================
-# WELCOME / GOODBYE
+# WELCOME
 # =====================
 
 @bot.event
@@ -84,6 +88,10 @@ async def on_member_join(member):
 
         await channel.send(embed=embed)
 
+
+# =====================
+# GOODBYE
+# =====================
 
 @bot.event
 async def on_member_remove(member):
@@ -200,21 +208,28 @@ async def on_message(message):
             text="VOID • Suggestions"
         )
 
-
         await message.delete()
-
 
         msg = await message.channel.send(
             embed=embed
         )
 
-
         await msg.add_reaction("👍")
         await msg.add_reaction("👎")
 
 
-    await bot.process_commands(message)
+    # الفاصل
+    if message.channel.id == CHANNEL_ID:
 
+        embed = discord.Embed()
+        embed.set_image(url=SEPARATOR_IMAGE)
+
+        await message.channel.send(
+            embed=embed
+        )
+
+
+    await bot.process_commands(message)
 
 
 # =====================
@@ -254,7 +269,6 @@ async def قيف(ctx, time:int, winners:int, *, prize):
 
     users = []
 
-
     for reaction in msg.reactions:
 
         if str(reaction.emoji) == "🎉":
@@ -275,7 +289,6 @@ async def قيف(ctx, time:int, winners:int, *, prize):
 
         end = bot.get_channel(GIVEAWAY_END)
 
-
         if end:
 
             await end.send(
@@ -283,9 +296,13 @@ async def قيف(ctx, time:int, winners:int, *, prize):
                 " ".join(
                     x.mention for x in winners_list
                 )
-)
-            else:
-    await ctx.send("❌ لا يوجد مشاركين")
+            )
+
+    else:
+
+        await ctx.send(
+            "❌ لا يوجد مشاركين"
+        )
 
 # =====================
 # الفعاليات + رتبة King Game
@@ -424,7 +441,7 @@ async def سجل_تكت(ctx, *, text):
 
     await ctx.send(
         "✅ تم إرسال اللوق"
-    )
+            )
 
 # =====================
 # أوامر الإدارة
@@ -478,7 +495,7 @@ async def القمها(ctx, member: discord.Member):
 
 @bot.command()
 @commands.has_permissions(manage_messages=True)
-async def حذف(ctx, amount:int):
+async def حذف(ctx, amount: int):
 
     await ctx.channel.purge(
         limit=amount
@@ -551,6 +568,10 @@ async def مساعدة(ctx):
 !بنق
 """,
         color=0x8000FF
+    )
+
+    embed.set_footer(
+        text="VOID • Bot"
     )
 
     await ctx.send(
