@@ -48,17 +48,56 @@ bot = commands.Bot(
 
 
 # =====================
+# نظام القوانين
+# =====================
+
+class RulesButton(discord.ui.View):
+
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(
+        label="أوافق على القوانين",
+        emoji="🖤",
+        style=discord.ButtonStyle.success
+    )
+    async def agree(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button
+    ):
+
+        role = interaction.guild.get_role(THE_VOID_ROLE)
+
+        if role:
+            await interaction.user.add_roles(role)
+
+            await interaction.response.send_message(
+                "✅ تم إعطاؤك رتبة 🖤 THE VOID",
+                ephemeral=True
+            )
+
+        else:
+            await interaction.response.send_message(
+                "❌ الرتبة غير موجودة",
+                ephemeral=True
+            )
+
+
+# =====================
 # READY
 # =====================
 
 @bot.event
 async def on_ready():
+
     bot.add_view(RulesButton())
+
     print(f"Logged in as {bot.user}")
 
 
 # =====================
-# WELCOME
+# WELCOME / GOODBYE
 # =====================
 
 @bot.event
@@ -72,6 +111,7 @@ async def on_member_join(member):
     channel = bot.get_channel(WELCOME_CHANNEL)
 
     if channel:
+
         embed = discord.Embed(
             title="🖤 WELCOME TO VOID",
             description=(
@@ -86,12 +126,10 @@ async def on_member_join(member):
             text="VOID • Community"
         )
 
-        await channel.send(embed=embed)
+        await channel.send(
+            embed=embed
+        )
 
-
-# =====================
-# GOODBYE
-# =====================
 
 @bot.event
 async def on_member_remove(member):
@@ -113,47 +151,14 @@ async def on_member_remove(member):
             text="VOID • Community"
         )
 
-        await channel.send(embed=embed)
+        await channel.send(
+            embed=embed
+        )
+
 
 # =====================
-# نظام القوانين بزر
+# أمر القوانين
 # =====================
-
-class RulesButton(discord.ui.View):
-
-    def __init__(self):
-        super().__init__(timeout=None)
-
-
-    @discord.ui.button(
-        label="أوافق على القوانين",
-        emoji="🖤",
-        style=discord.ButtonStyle.success
-    )
-    async def agree(
-        self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button
-    ):
-
-        role = interaction.guild.get_role(THE_VOID_ROLE)
-
-        if role:
-
-            await interaction.user.add_roles(role)
-
-            await interaction.response.send_message(
-                "✅ تم إعطاؤك رتبة 🖤 THE VOID",
-                ephemeral=True
-            )
-
-        else:
-
-            await interaction.response.send_message(
-                "❌ الرتبة غير موجودة",
-                ephemeral=True
-            )
-
 
 @bot.command()
 @commands.has_permissions(administrator=True)
@@ -174,14 +179,18 @@ async def قوانين(ctx):
         color=0x8000FF
     )
 
+    embed.set_footer(
+        text="VOID • Rules"
+    )
+
     await ctx.send(
         embed=embed,
         view=RulesButton()
-    )
+        )
 
 
 # =====================
-# الاقتراحات
+# الاقتراحات + الفاصل
 # =====================
 
 @bot.event
@@ -191,6 +200,7 @@ async def on_message(message):
         return
 
 
+    # نظام الاقتراحات
     if message.channel.id == SUGGEST_CHANNEL:
 
         embed = discord.Embed(
@@ -218,11 +228,14 @@ async def on_message(message):
         await msg.add_reaction("👎")
 
 
-    # الفاصل
+    # الفاصل بعد الرسائل
     if message.channel.id == CHANNEL_ID:
 
         embed = discord.Embed()
-        embed.set_image(url=SEPARATOR_IMAGE)
+
+        embed.set_image(
+            url=SEPARATOR_IMAGE
+        )
 
         await message.channel.send(
             embed=embed
@@ -232,13 +245,14 @@ async def on_message(message):
     await bot.process_commands(message)
 
 
+
 # =====================
 # القيف أواي
 # =====================
 
 @bot.command()
 @commands.has_permissions(manage_guild=True)
-async def قيف(ctx, time:int, winners:int, *, prize):
+async def قيف(ctx, time: int, winners: int, *, prize):
 
     if ctx.channel.id != GIVEAWAY_START:
         return
@@ -255,8 +269,14 @@ async def قيف(ctx, time:int, winners:int, *, prize):
         color=0x8000FF
     )
 
+    embed.set_footer(
+        text="VOID • Giveaway"
+    )
 
-    msg = await ctx.send(embed=embed)
+
+    msg = await ctx.send(
+        embed=embed
+    )
 
     await msg.add_reaction("🎉")
 
@@ -264,7 +284,9 @@ async def قيف(ctx, time:int, winners:int, *, prize):
     await asyncio.sleep(time)
 
 
-    msg = await ctx.channel.fetch_message(msg.id)
+    msg = await ctx.channel.fetch_message(
+        msg.id
+    )
 
 
     users = []
@@ -287,14 +309,17 @@ async def قيف(ctx, time:int, winners:int, *, prize):
         )
 
 
-        end = bot.get_channel(GIVEAWAY_END)
+        end = bot.get_channel(
+            GIVEAWAY_END
+        )
 
         if end:
 
             await end.send(
                 "🎉 الفائزين:\n" +
                 " ".join(
-                    x.mention for x in winners_list
+                    user.mention
+                    for user in winners_list
                 )
             )
 
@@ -302,10 +327,11 @@ async def قيف(ctx, time:int, winners:int, *, prize):
 
         await ctx.send(
             "❌ لا يوجد مشاركين"
-        )
+    )
+
 
 # =====================
-# الفعاليات + رتبة King Game
+# الفعاليات + البوست + الإحصائيات + اللوق + الإدارة
 # =====================
 
 @bot.command()
@@ -330,22 +356,13 @@ async def فعالية(ctx, member: discord.Member):
             color=0x8000FF
         )
 
-        embed.set_footer(
-            text="VOID • Events"
-        )
-
         await ctx.send(embed=embed)
 
     else:
-
         await ctx.send(
             "❌ رتبة King Game غير موجودة"
         )
 
-
-# =====================
-# البوست
-# =====================
 
 @bot.event
 async def on_member_update(before, after):
@@ -354,7 +371,9 @@ async def on_member_update(before, after):
 
         if after.premium_since:
 
-            channel = bot.get_channel(BOOST_CHANNEL)
+            channel = bot.get_channel(
+                BOOST_CHANNEL
+            )
 
             if channel:
 
@@ -366,24 +385,18 @@ async def on_member_update(before, after):
                     color=0x8000FF
                 )
 
-                embed.set_footer(
-                    text="VOID • Boost"
-                )
-
                 await channel.send(
                     embed=embed
                 )
 
 
-# =====================
-# الإحصائيات
-# =====================
-
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def تحديث_الإحصائيات(ctx):
 
-    channel = bot.get_channel(STATS_CHANNEL)
+    channel = bot.get_channel(
+        STATS_CHANNEL
+    )
 
     if channel:
 
@@ -397,22 +410,16 @@ async def تحديث_الإحصائيات(ctx):
             color=0x8000FF
         )
 
-        embed.set_footer(
-            text="VOID • Statistics"
-        )
-
         await channel.send(
             embed=embed
         )
 
 
-# =====================
-# لوق التكت
-# =====================
-
 async def send_log(text):
 
-    channel = bot.get_channel(TICKET_LOG)
+    channel = bot.get_channel(
+        TICKET_LOG
+    )
 
     if channel:
 
@@ -420,10 +427,6 @@ async def send_log(text):
             title="📋 VOID LOG",
             description=text,
             color=0x8000FF
-        )
-
-        embed.set_footer(
-            text="VOID • Logs"
         )
 
         await channel.send(
@@ -441,7 +444,8 @@ async def سجل_تكت(ctx, *, text):
 
     await ctx.send(
         "✅ تم إرسال اللوق"
-            )
+    )
+
 
 # =====================
 # أوامر الإدارة
@@ -538,10 +542,6 @@ async def بنق(ctx):
     )
 
 
-# =====================
-# المساعدة
-# =====================
-
 @bot.command()
 async def مساعدة(ctx):
 
@@ -568,27 +568,3 @@ async def مساعدة(ctx):
 !بنق
 """,
         color=0x8000FF
-    )
-
-    embed.set_footer(
-        text="VOID • Bot"
-    )
-
-    await ctx.send(
-        embed=embed
-    )
-
-
-# =====================
-# تشغيل البوت
-# =====================
-
-TOKEN = os.getenv("TOKEN")
-
-if TOKEN:
-
-    bot.run(TOKEN)
-
-else:
-
-    print("❌ TOKEN غير موجود")
