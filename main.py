@@ -21,15 +21,15 @@ async def on_message(message):
         return
 
     if message.channel.id == CHANNEL_ID:
-        await message.channel.send(SEPARATOR_IMAGE)
+        embed = discord.Embed()
+        embed.set_image(url=SEPARATOR_IMAGE)
+        await message.channel.send(embed=embed)
 
     await bot.process_commands(message)
-
 
 @bot.command()
 async def ping(ctx):
     await ctx.send("🏓 Pong!")
-
 
 TOKEN = os.getenv("TOKEN")
 bot.run(TOKEN)
