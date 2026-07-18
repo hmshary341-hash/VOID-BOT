@@ -35,9 +35,13 @@ async def main():
 
     await load_cogs()
 
-    TOKEN = os.getenv("TOKEN")
+    token = os.getenv("TOKEN")
 
-    await bot.start(TOKEN)
+    if token is None:
+        print("❌ TOKEN غير موجود")
+        return
+
+    await bot.start(token)
 
 
 asyncio.run(main())
