@@ -1,72 +1,60 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 
-TICKET_CATEGORY = 1525952823156801576
-TICKET_IMAGE_URL = "https://i.ibb.co/3mN68wM/VOID-Logo.png" 
+# 1. النافذة التي تظهر للمستخدم بعد اختيار نوع التذكرة لتعبئة بياناته
+class TicketModal(discord.ui.Modal):
+    def __init__(self, title_name):
+        super().__init__(title=title_name)
+    
+    username = discord.ui.TextInput(label='يوزر الديسكورد', placeholder='اكتب يوزرك هنا')
+    reason = discord.ui.TextInput(label='السبب / المشكلة', style=discord.TextStyle.paragraph, placeholder='اشرح بالتفصيل')
+    proof = discord.ui.TextInput(label='الدليل (رابط)', required=False, placeholder='ضع رابط الصورة أو الدليل')
 
-class TicketReason(discord.ui.Select):
+    async def on_submit(self, interaction: discord.Interaction):
+        # إنشاء القناة
+        guild = interaction.guild
+        category = discord.utils.get(guild.categories, name="TICKETS")
+        channel = await guild.create_text_channel(name=f"ticket-{interaction.user.name}", category=category)
+        
+        # اللوحة الداخلية للتذكرة
+        embed = discord.Embed(title="نظام التذاكر - Raven Support", color=discord.Color.red())
+        embed.add_field(name="👤 المالك", value=interaction.user.mention, inline=False)
+        embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
+        embed.add_field(name="🔗 الدليل", value=self.proof.value if self.proof.value else "لا يوجد", inline=False)
+        
+        await channel.send(embed=embed)
+        await interaction.response.send_message(f"✅ تم فتح التذكرة بنجاح: {channel.mention}", ephemeral=True)
+
+# 2. القائمة المنسدلة
+class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label="إبلاغ إداري", emoji="👮"),
-            discord.SelectOption(label="إبلاغ عضو", emoji="👤"),
-            discord.SelectOption(label="استفسار", emoji="❓")
+            discord.SelectOption(label='إبلاغ عن عضو', value='إبلاغ عن عضو', emoji='👤'),
+            discord.SelectOption(label='إبلاغ عن إداري', value='إبلاغ عن إداري', emoji='🛡️'),
+            discord.SelectOption(label='استفسار', value='استفسار', emoji='❓'),
+            discord.SelectOption(label='حل مشكلة', value='حل مشكلة', emoji='🔧'),
         ]
-        super().__init__(placeholder="اختر سبب التكت", options=options)
+        super().__init__(placeholder='اختر سبب فتح التذكرة...', options=options)
 
-    async def callback(self, interaction):
-        await interaction.response.send_modal(TicketModal(self.values[0]))
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(TicketModal(title_name=self.values[0]))
 
-class TicketMenu(discord.ui.View):
+class TicketView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
-        self.add_item(TicketReason())
+        self.add_item(TicketSelect())
 
-class TicketModal(discord.ui.Modal):
-    def __init__(self, reason):
-        super().__init__(title="بيانات التكت")
-        self.reason = reason
-        self.user = discord.ui.TextInput(label="يوزر العضو", placeholder="اكتب اليوزر")
-        self.problem = discord.ui.TextInput(label="السبب", placeholder="اكتب سبب المشكلة")
-        self.proof = discord.ui.TextInput(label="الدليل", placeholder="ضع الرابط أو اكتب لا يوجد", required=False)
-        self.add_item(self.user); self.add_item(self.problem); self.add_item(self.proof)
-
-    async def on_submit(self, interaction):
-        guild = interaction.guild
-        category = guild.get_channel(TICKET_CATEGORY)
-        channel = await guild.create_text_channel(name=f"ticket-{interaction.user.name}", category=category)
-        await channel.set_permissions(interaction.user, view_channel=True, send_messages=True)
-
-        embed = discord.Embed(title="🎫 تكت جديد", description="افتح تكت وإن شاء الله تنحل مشكلتك 🖤", color=0x8000FF)
-        embed.add_field(name="النوع", value=self.reason, inline=False)
-        embed.add_field(name="العضو", value=str(self.user), inline=False)
-        embed.add_field(name="السبب", value=str(self.problem), inline=False)
-        embed.add_field(name="الدليل", value=str(self.proof), inline=False)
-
-        await channel.send(interaction.user.mention, embed=embed, view=TicketControl())
-        await interaction.response.send_message(f"✅ تم فتح التكت: {channel.mention}", ephemeral=True)
-
-class TicketControl(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="✅ استلام تكت", style=discord.ButtonStyle.success, custom_id="claim_tkt")
-    async def claim(self, interaction, button):
-        await interaction.response.send_message(f"✅ تم استلام التكت بواسطة {interaction.user.mention}")
-    @discord.ui.button(label="🔒 إغلاق تكت", style=discord.ButtonStyle.danger, custom_id="close_tkt")
-    async def close(self, interaction, button): await interaction.channel.delete()
-
-class Tickets(commands.Cog):
-    def __init__(self, bot): self.bot = bot
-    @commands.command()
-    @commands.has_permissions(administrator=True)
-    async def ارسل(self, ctx, arg=None):
-        if arg == "تكت":
-            embed = discord.Embed(title="🎫 نظام التذاكر", description="**افتح تكت وإن شاء الله تنحل مشكلتك** 🖤", color=0x8000FF)
-            embed.set_image(url=TICKET_IMAGE_URL)
-            await ctx.send(embed=embed, view=OpenTicket())
-
-class OpenTicket(discord.ui.View):
-    def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="🎫 افتح تكت", style=discord.ButtonStyle.primary, custom_id="open_tkt_btn")
-    async def open(self, interaction, button):
-        await interaction.response.send_message("اختر سبب التكت:", view=TicketMenu(), ephemeral=True)
-
-async def setup(bot): await bot.add_cog(Tickets(bot))
+# 3. الأمر لبدء النظام (اكتب !setup في ديسكورد)
+@commands.command()
+@commands.has_permissions(administrator=True)
+async def setup(ctx):
+    embed = discord.Embed(
+        title="الدعم الفني",
+        description="يمنع فتح تكت للعبث أو لأسباب غير جدية.\nاختر سبب فتح التكت من القائمة أدناه.",
+        color=discord.Color.blue()
+    )
+    # ضع رابط صورتك هنا
+    embed.set_image(url="https://cdn.discordapp.com/attachments/1508247176457748620/1528159877502074890/file_00000000da1c71f4863b28202a995e4e.png")
+    
+    await ctx.send(embed=embed, view=TicketView())
