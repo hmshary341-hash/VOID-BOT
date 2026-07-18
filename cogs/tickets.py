@@ -1,3 +1,14 @@
+import discord
+from discord import app_commands
+from discord.ext import commands
+from datetime import datetime
+import io
+
+# --- الإعدادات (تأكد من مطابقة المعرفات لما عندك) ---
+CATEGORY_ID = 1525952823156801576
+LOG_CHANNEL_ID = 1527750890952462408
+ticket_counter = 3568
+
 class TicketActions(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -10,28 +21,75 @@ class TicketActions(discord.ui.View):
     @discord.ui.button(label="حذف التذكرة", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="delete_ticket")
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("🗑️ جاري حفظ المحادثة وحذف التذكرة...", ephemeral=True)
-        
-        # تجميع المحادثة
         transcript = []
         async for message in interaction.channel.history(limit=None, oldest_first=True):
             transcript.append(f"{message.author.name}: {message.content}")
-        
         log_channel = interaction.guild.get_channel(LOG_CHANNEL_ID)
         if log_channel:
-            # إنشاء الملف
             file = discord.File(io.StringIO("\n".join(transcript)), filename=f"transcript-{interaction.channel.name}.txt")
-            
-            # إنشاء الـ Embed الجمالي
-            embed = discord.Embed(
-                title="📋 سجل تذكرة محذوفة",
-                color=discord.Color.red(),
-                timestamp=datetime.now()
-            )
+            embed = discord.Embed(title="📋 سجل تذكرة محذوفة", color=discord.Color.red(), timestamp=datetime.now())
             embed.add_field(name="اسم القناة:", value=interaction.channel.name, inline=True)
             embed.add_field(name="حُذفت بواسطة:", value=interaction.user.mention, inline=True)
-            embed.set_footer(text="VOID APP | نظام الأرشفة")
-            
-            # إرسال الـ Embed مع الملف
             await log_channel.send(embed=embed, file=file)
-            
         await interaction.channel.delete()
+
+# --- النماذج والقوائم ---
+class ReportModal(discord.ui.Modal):
+    def __init__(self, title_name):
+        super().__init__(title=title_name)
+        self.add_item(discord.ui.TextInput(label='يوزر الشخص', placeholder='اكتب يوزر العضو أو الإداري'))
+        self.add_item(discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph))
+        self.add_item(discord.ui.TextInput(label='الدليل (رابط)', required=False))
+    async def on_submit(self, interaction: discord.Interaction):
+        await create_ticket(interaction, self.title, self.children[0].value, self.children[1].value, self.children[2].value)
+
+class NormalModal(discord.ui.Modal):
+    def __init__(self, title_name):
+        super().__init__(title=title_name)
+        self.add_item(discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph))
+        self.add_item(discord.ui.TextInput(label='الدليل (رابط)', required=False))
+    async def on_submit(self, interaction: discord.Interaction):
+        await create_ticket(interaction, self.title, "لا يوجد", self.children[0].value, self.children[1].value)
+
+async def create_ticket(interaction, title, user_target, reason, proof):
+    global ticket_counter
+    ticket_counter += 1
+    guild = interaction.guild
+    category = guild.get_channel(CATEGORY_ID)
+    channel = await guild.create_text_channel(name=f"🎫・{ticket_counter}", category=category)
+    embed = discord.Embed(color=discord.Color.dark_theme())
+    embed.add_field(name="👤 : مالك التذكرة", value=interaction.user.mention, inline=False)
+    embed.add_field(name="📅 : تاريخ التذكرة", value=datetime.now().strftime("%A, %B %d, %Y %I:%M %p"), inline=False)
+    embed.add_field(name="📝 : السبب", value=reason, inline=False)
+    await channel.send(content=f"{interaction.user.mention} | @Staff", embed=embed, view=TicketActions())
+    await interaction.followup.send(f"✅ تم فتح التذكرة: {channel.mention}", ephemeral=True)
+
+class TicketSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label='إبلاغ عن عضو', value='إبلاغ عن عضو', emoji='👤'),
+            discord.SelectOption(label='استفسار', value='استفسار', emoji='❓'),
+        ]
+        super().__init__(placeholder='اختر سبب فتح التذكرة...', options=options)
+    async def callback(self, interaction: discord.Interaction):
+        if 'إبلاغ' in self.values[0]: await interaction.response.send_modal(ReportModal(title_name=self.values[0]))
+        else: await interaction.response.send_modal(NormalModal(title_name=self.values[0]))
+
+class TicketView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(TicketSelect())
+
+# --- كلاس التكت الرئيسي ---
+class Tickets(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="ارسل_تكت", description="إرسال رسالة نظام التذاكر")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def send_ticket(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="الدعم الفني", description="اختر سبب فتح التكت من القائمة أدناه.", color=discord.Color.blue())
+        await interaction.response.send_message(embed=embed, view=TicketView())
+
+async def setup(bot):
+    await bot.add_cog(Tickets(bot))
