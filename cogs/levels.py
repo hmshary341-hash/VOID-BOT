@@ -2,9 +2,13 @@ import discord
 from discord.ext import commands
 import json
 import os
+from PIL import Image, ImageDraw, ImageFont
+import io
+import aiohttp
 
 
 DATA = "levels.json"
+
 
 LEVEL_ROLES = {
     5: 1526291094747353189,
@@ -23,13 +27,75 @@ def load_data():
     if os.path.exists(DATA):
         with open(DATA, "r") as f:
             return json.load(f)
-
     return {}
 
 
 def save_data(data):
     with open(DATA, "w") as f:
         json.dump(data, f, indent=4)
+
+
+async def create_card(member, level, xp):
+
+    img = Image.new(
+        "RGB",
+        (900, 300),
+        (128, 0, 255)
+    )
+
+    draw = ImageDraw.Draw(img)
+
+
+    avatar = await member.display_avatar.read()
+
+    avatar_img = Image.open(
+        io.BytesIO(avatar)
+    ).convert("RGBA")
+
+    avatar_img = avatar_img.resize(
+        (180, 180)
+    )
+
+    img.paste(
+        avatar_img,
+        (50, 60),
+        avatar_img
+    )
+
+
+    draw.text(
+        (270, 70),
+        member.name,
+        fill="white"
+    )
+
+    draw.text(
+        (270, 120),
+        f"Level : {level}",
+        fill="white"
+    )
+
+    draw.text(
+        (270, 160),
+        f"XP : {xp}",
+        fill="white"
+    )
+
+
+    file = io.BytesIO()
+
+    img.save(
+        file,
+        "PNG"
+    )
+
+    file.seek(0)
+
+    return discord.File(
+        file,
+        filename="level.png"
+    )
+
 
 
 class Levels(commands.Cog):
@@ -45,16 +111,17 @@ class Levels(commands.Cog):
         if message.author.bot:
             return
 
+
         user = str(message.author.id)
 
+
         if user not in self.data:
+
             self.data[user] = {
                 "xp": 0,
                 "level": 1
             }
 
-
-        old_level = self.data[user]["level"]
 
         self.data[user]["xp"] += 5
 
@@ -67,23 +134,29 @@ class Levels(commands.Cog):
 
             self.data[user]["level"] += 1
 
-            new_level = self.data[user]["level"]
+            level = self.data[user]["level"]
 
 
-            await message.channel.send(
-                f"🎉 ترقية جديدة!\n\n"
-                f"مبروك {message.author.mention} 🖤💜\n"
-                f"وصلت المستوى **{new_level}** ✨\n\n"
-                "كفو كمل تفاعل 🔥\n"
-                "يلا توكل واستمر، الجايات أقوى 💪\n\n"
-                "VOID 🖤"
+            card = await create_card(
+                message.author,
+                level,
+                xp
             )
 
 
-            if new_level in LEVEL_ROLES:
+            await message.channel.send(
+                content=(
+                    f"🎉 ترقية جديدة!\n"
+                    f"كفو كمل تفاعل 🔥"
+                ),
+                file=card
+            )
+
+
+            if level in LEVEL_ROLES:
 
                 role = message.guild.get_role(
-                    LEVEL_ROLES[new_level]
+                    LEVEL_ROLES[level]
                 )
 
                 if role:
@@ -93,33 +166,31 @@ class Levels(commands.Cog):
         save_data(self.data)
 
 
+
     @commands.command(name="مستواي")
     async def my_level(self, ctx):
 
         user = str(ctx.author.id)
 
-        if user not in self.data:
 
+        if user not in self.data:
             await ctx.send(
                 "❌ ما عندك مستوى للحين"
             )
-
             return
 
 
-        embed = discord.Embed(
-            title="📊 مستواك",
-            description=(
-                f"⭐ المستوى: {self.data[user]['level']}\n"
-                f"✨ النقاط: {self.data[user]['xp']}"
-            ),
-            color=0x800080
+        card = await create_card(
+            ctx.author,
+            self.data[user]["level"],
+            self.data[user]["xp"]
         )
 
 
         await ctx.send(
-            embed=embed
+            file=card
         )
+
 
 
 async def setup(bot):
