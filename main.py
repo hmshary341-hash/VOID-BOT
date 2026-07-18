@@ -78,10 +78,11 @@ async def on_member_join(member):
             color=0x8000FF
         )
 
-        embed.set_footer(text="VOID • Community")
+        embed.set_footer(
+            text="VOID • Community"
+        )
 
         await channel.send(embed=embed)
-
 
 
 @bot.event
@@ -90,6 +91,7 @@ async def on_member_remove(member):
     channel = bot.get_channel(GOODBYE_CHANNEL)
 
     if channel:
+
         embed = discord.Embed(
             title="🖤 GOODBYE FROM VOID",
             description=(
@@ -99,7 +101,9 @@ async def on_member_remove(member):
             color=0x8000FF
         )
 
-        embed.set_footer(text="VOID • Community")
+        embed.set_footer(
+            text="VOID • Community"
+        )
 
         await channel.send(embed=embed)
 
@@ -127,6 +131,7 @@ class RulesButton(discord.ui.View):
         role = interaction.guild.get_role(THE_VOID_ROLE)
 
         if role:
+
             await interaction.user.add_roles(role)
 
             await interaction.response.send_message(
@@ -135,6 +140,7 @@ class RulesButton(discord.ui.View):
             )
 
         else:
+
             await interaction.response.send_message(
                 "❌ الرتبة غير موجودة",
                 ephemeral=True
@@ -166,7 +172,6 @@ async def قوانين(ctx):
     )
 
 
-
 # =====================
 # الاقتراحات
 # =====================
@@ -176,6 +181,7 @@ async def on_message(message):
 
     if message.author.bot:
         return
+
 
     if message.channel.id == SUGGEST_CHANNEL:
 
@@ -194,11 +200,14 @@ async def on_message(message):
             text="VOID • Suggestions"
         )
 
+
         await message.delete()
+
 
         msg = await message.channel.send(
             embed=embed
         )
+
 
         await msg.add_reaction("👍")
         await msg.add_reaction("👎")
@@ -225,7 +234,7 @@ async def قيف(ctx, time:int, winners:int, *, prize):
         description=(
             f"🎁 الجائزة: {prize}\n\n"
             f"⏳ الوقت: {time} ثانية\n"
-            f"🏆 الفائزين: {winners}\n\n"
+            f"🏆 عدد الفائزين: {winners}\n\n"
             "اضغط 🎉 للمشاركة"
         ),
         color=0x8000FF
@@ -245,6 +254,7 @@ async def قيف(ctx, time:int, winners:int, *, prize):
 
     users = []
 
+
     for reaction in msg.reactions:
 
         if str(reaction.emoji) == "🎉":
@@ -263,20 +273,18 @@ async def قيف(ctx, time:int, winners:int, *, prize):
         )
 
 
-        channel = bot.get_channel(GIVEAWAY_END)
+        end = bot.get_channel(GIVEAWAY_END)
 
-        if channel:
 
-            await channel.send(
+        if end:
+
+            await end.send(
                 "🎉 الفائزين:\n" +
                 " ".join(
                     x.mention for x in winners_list
-
-                
                 )
-        )
-    else:
-        await ctx.send("❌ لا يوجد مشاركين")
+)
+
 # =====================
 # الفعاليات + رتبة King Game
 # =====================
@@ -291,6 +299,7 @@ async def فعالية(ctx, member: discord.Member):
     role = ctx.guild.get_role(KING_GAME_ROLE)
 
     if role:
+
         await member.add_roles(role)
 
         embed = discord.Embed(
@@ -302,10 +311,17 @@ async def فعالية(ctx, member: discord.Member):
             color=0x8000FF
         )
 
+        embed.set_footer(
+            text="VOID • Events"
+        )
+
         await ctx.send(embed=embed)
 
     else:
-        await ctx.send("❌ رتبة King Game غير موجودة")
+
+        await ctx.send(
+            "❌ رتبة King Game غير موجودة"
+        )
 
 
 # =====================
@@ -331,8 +347,13 @@ async def on_member_update(before, after):
                     color=0x8000FF
                 )
 
-                await channel.send(embed=embed)
+                embed.set_footer(
+                    text="VOID • Boost"
+                )
 
+                await channel.send(
+                    embed=embed
+                )
 
 
 # =====================
@@ -357,8 +378,13 @@ async def تحديث_الإحصائيات(ctx):
             color=0x8000FF
         )
 
-        await channel.send(embed=embed)
+        embed.set_footer(
+            text="VOID • Statistics"
+        )
 
+        await channel.send(
+            embed=embed
+        )
 
 
 # =====================
@@ -377,8 +403,13 @@ async def send_log(text):
             color=0x8000FF
         )
 
-        await channel.send(embed=embed)
+        embed.set_footer(
+            text="VOID • Logs"
+        )
 
+        await channel.send(
+            embed=embed
+        )
 
 
 @bot.command()
@@ -389,7 +420,9 @@ async def سجل_تكت(ctx, *, text):
         f"🎫 {ctx.author.mention}\n{text}"
     )
 
-    await ctx.send("✅ تم إرسال اللوق")
+    await ctx.send(
+        "✅ تم إرسال اللوق"
+    )
 
 # =====================
 # أوامر الإدارة
@@ -459,7 +492,9 @@ async def قفل(ctx):
         send_messages=False
     )
 
-    await ctx.send("🔒 تم قفل الروم")
+    await ctx.send(
+        "🔒 تم قفل الروم"
+    )
 
 
 @bot.command()
@@ -471,7 +506,9 @@ async def فتح(ctx):
         send_messages=True
     )
 
-    await ctx.send("🔓 تم فتح الروم")
+    await ctx.send(
+        "🔓 تم فتح الروم"
+    )
 
 
 @bot.command()
@@ -480,7 +517,6 @@ async def بنق(ctx):
     await ctx.send(
         f"🏓 {round(bot.latency * 1000)}ms"
     )
-
 
 
 # =====================
@@ -507,6 +543,7 @@ async def مساعدة(ctx):
 !فعالية
 !قوانين
 !تحديث_الإحصائيات
+!سجل_تكت
 
 ⚙️:
 !بنق
@@ -514,8 +551,9 @@ async def مساعدة(ctx):
         color=0x8000FF
     )
 
-    await ctx.send(embed=embed)
-
+    await ctx.send(
+        embed=embed
+    )
 
 
 # =====================
@@ -525,7 +563,9 @@ async def مساعدة(ctx):
 TOKEN = os.getenv("TOKEN")
 
 if TOKEN:
+
     bot.run(TOKEN)
 
 else:
+
     print("❌ TOKEN غير موجود")
