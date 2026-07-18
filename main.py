@@ -1,10 +1,13 @@
-import os
 import discord
 from discord.ext import commands
+import os
+import asyncio
+
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+
 
 bot = commands.Bot(
     command_prefix="!",
@@ -16,18 +19,25 @@ bot = commands.Bot(
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
 
+
+async def load_cogs():
+
     for file in os.listdir("./cogs"):
+
         if file.endswith(".py"):
-            try:
-                await bot.load_extension(f"cogs.{file[:-3]}")
-                print(f"✅ Loaded {file}")
-            except Exception as e:
-                print(f"❌ Error loading {file}: {e}")
+
+            await bot.load_extension(
+                f"cogs.{file[:-3]}"
+            )
 
 
-TOKEN = os.getenv("TOKEN")
+async def main():
 
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("❌ TOKEN غير موجود")
+    await load_cogs()
+
+    TOKEN = os.getenv("TOKEN")
+
+    await bot.start(TOKEN)
+
+
+asyncio.run(main())
