@@ -1,54 +1,44 @@
 import discord
-import os
-import asyncio
 from discord.ext import commands
-from dotenv import load_dotenv
+import asyncio
 
-# تحميل المتغيرات
-load_dotenv()
-TOKEN = os.getenv("TOKEN")
+# إعدادات الـ Intents
+intents = discord.Intents.all()
 
-# إعداد الصلاحيات
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
+class MyBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix="!", intents=intents)
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+    # هذا هو الحل الجذري: نضع التحميل هنا في setup_hook
+    async def setup_hook(self):
+        # ضع هنا قائمة بجميع ملفاتك في مجلد cogs
+        extensions = [
+            "cogs.logs", "cogs.tickets", "cogs.Admin", "cogs.staff_review", 
+            "cogs.warnings", "cogs.welcome", "cogs.events", "cogs.moderation", 
+            "cogs.rules", "cogs.AutoDivider", "cogs.suggestions", "cogs.anti_raid", 
+            "cogs.stats", "cogs.general", "cogs.anti_nuke", "cogs.security", 
+            "cogs.giveaway", "cogs.levels"
+        ]
+        
+        for ext in extensions:
+            try:
+                await self.load_extension(ext)
+                print(f"✅ تم تحميل: {ext}")
+            except Exception as e:
+                print(f"❌ فشل تحميل {ext}: {e}")
+        
+        # مزامنة أوامر السلاش مرة واحدة فقط
+        await self.tree.sync()
+        print("🚀 تم مزامنة الأوامر وبدء البوت بنجاح!")
 
-# دالة تحميل الملفات (مرة واحدة فقط)
-async def load_extensions():
-    path = './cogs'
-    if not os.path.exists(path):
-        print(f"⚠️ المجلد {path} غير موجود!")
-        return
-
-    # استخدام set لتجنب التكرار إذا كان المجلد يحتوي على ملفات متشابهة
-    loaded = set()
-    for filename in os.listdir(path):
-        if filename.endswith('.py') and filename != '__init__.py':
-            extension_name = f'cogs.{filename[:-3]}'
-            if extension_name not in loaded:
-                try:
-                    await bot.load_extension(extension_name)
-                    print(f'📂 تم تحميل: {extension_name}')
-                    loaded.add(extension_name)
-                except Exception as e:
-                    print(f'❌ فشل تحميل {extension_name}: {e}')
+# إنشاء البوت
+bot = MyBot()
 
 @bot.event
 async def on_ready():
-    print(f'✅ البوت يعمل الآن: {bot.user}')
-    try:
-        synced = await bot.tree.sync()
-        print(f'🔄 تم مزامنة {len(synced)} أمر.')
-    except Exception as e:
-        print(f'❌ خطأ في المزامنة: {e}')
+    # هنا لا تضع أي شيء سوى رسالة الترحيب (لا تضع load_extension هنا أبداً)
+    print(f"🔥 {bot.user} يعمل الآن بكامل قوته!")
 
-async def main():
-    # هنا يتم التحميل مرة واحدة فقط عند بدء التشغيل
-    async with bot:
-        await load_extensions()
-        await bot.start(TOKEN)
-
-if __name__ == '__main__':
-    asyncio.run(main())
+# تشغيل البوت
+bot.run("YOUR_TOKEN_HERE") # استبدل هذا بالتوكن الخاص بك
+ض
