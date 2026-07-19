@@ -3,17 +3,16 @@ from discord import app_commands
 from discord.ext import commands
 import json
 import os
-import chat_exporter
 import io
+import chat_exporter
 
-# --- الإعدادات ---
+# الإعدادات
 CATEGORY_ID = 1525952823156801576
 STAFF_ROLE_ID = 1527807423186862080
 LOG_CHANNEL_ID = 1527750890952462408
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
 FILE_PATH = "ticket_count.json"
 
-# دالة الترقيم التلقائي
 def get_next_ticket_number():
     if not os.path.exists(FILE_PATH):
         count = 1
@@ -28,7 +27,6 @@ def get_next_ticket_number():
         json.dump({"count": count + 1}, f)
     return count
 
-# --- الأزرار ---
 class TicketActions(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -37,9 +35,7 @@ class TicketActions(discord.ui.View):
     @discord.ui.button(label="استلام التذكرة", style=discord.ButtonStyle.primary, emoji="✅", custom_id="claim_ticket")
     async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        if self.claimed_by:
-            await interaction.followup.send(f"⚠️ مستلمة بالفعل بواسطة {self.claimed_by.mention}", ephemeral=True)
-            return
+        if self.claimed_by: return
         self.claimed_by = interaction.user
         button.disabled = True
         embed = interaction.message.embeds[0]
@@ -57,7 +53,6 @@ class TicketActions(discord.ui.View):
     @discord.ui.button(label="حذف", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="delete_ticket")
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
-        # توثيق المحادثة
         transcript = await chat_exporter.export(interaction.channel)
         transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{interaction.channel.name}.html")
         
@@ -70,7 +65,6 @@ class TicketActions(discord.ui.View):
             
         await interaction.channel.delete()
 
-# --- النموذج ---
 class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     target = discord.ui.TextInput(label='يوزر الشخص المبلغ عنه', style=discord.TextStyle.short, required=True)
     reason = discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph, required=True)
@@ -98,9 +92,9 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
             await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions())
             await interaction.followup.send(f"✅ تم فتح تذكرتك: {channel.mention}", ephemeral=True)
         except Exception as e:
-            await interaction.followup.send("❌ حدث خطأ! تأكد من صلاحيات البوت.", ephemeral=True)
+            print(e)
+            await interaction.followup.send("❌ حدث خطأ!", ephemeral=True)
 
-# --- القوائم والأوامر ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(placeholder='اختر نوع التذكرة...', options=[
