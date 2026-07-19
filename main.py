@@ -1,37 +1,30 @@
-import os
 import discord
+import os
 import asyncio
 from discord.ext import commands
 
+# إعداد الصلاحيات (Intents) - ضرورية لعمل الأحداث (Events) مثل الترحيب
 intents = discord.Intents.all()
+
+# تعريف البوت
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# تم حذف "cogs.levels" من القائمة أدناه
-extensions = [
-    "cogs.logs", "cogs.tickets", "cogs.Admin", "cogs.staff_review", 
-    "cogs.warnings", "cogs.welcome", "cogs.events", "cogs.moderation", 
-    "cogs.rules", "cogs.AutoDivider", "cogs.suggestions", "cogs.anti_raid", 
-    "cogs.stats", "cogs.general", "cogs.anti_nuke", "cogs.security", 
-    "cogs.giveaway"
-]
-
-async def load_all():
-    for ext in extensions:
-        try:
-            await bot.load_extension(ext)
-            print(f"✅ تم تحميل: {ext}")
-        except Exception as e:
-            print(f"❌ خطأ في {ext}: {e}")
-
-@bot.event
-async def on_ready():
-    print(f"🔥 {bot.user} متصل ويعمل بثبات!")
+async def load_extensions():
+    # هذا اللوب سيحمل كل الملفات الموجودة في مجلد cogs فقط
+    # طالما أنك حذفت الملفات المشبوهة، البوت لن يحملها ولن يسبب خطأ
+    for filename in os.listdir('./cogs'):
+        if filename.endswith('.py'):
+            try:
+                await bot.load_extension(f'cogs.{filename[:-3]}')
+                print(f"✅ تم تحميل: {filename}")
+            except Exception as e:
+                print(f"❌ فشل تحميل {filename}: {e}")
 
 async def main():
     async with bot:
-        await load_all()
-        token = os.getenv("TOKEN")
-        await bot.start(token)
+        await load_extensions()
+        # ضع التوكين الخاص بك هنا (أو استخدم secrets في Railway)
+        await bot.start('ضع_التوكين_الخاص_ببوتك_هنا')
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())
