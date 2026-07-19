@@ -1,17 +1,17 @@
+import os
 import discord
 from discord.ext import commands
 import asyncio
 
-# إعدادات الـ Intents
+# إعدادات الصلاحيات
 intents = discord.Intents.all()
 
 class MyBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="!", intents=intents)
 
-    # هذا هو الحل الجذري: نضع التحميل هنا في setup_hook
+    # هذه الدالة تُشغل مرة واحدة فقط عند بداية البوت
     async def setup_hook(self):
-        # ضع هنا قائمة بجميع ملفاتك في مجلد cogs
         extensions = [
             "cogs.logs", "cogs.tickets", "cogs.Admin", "cogs.staff_review", 
             "cogs.warnings", "cogs.welcome", "cogs.events", "cogs.moderation", 
@@ -27,7 +27,7 @@ class MyBot(commands.Bot):
             except Exception as e:
                 print(f"❌ فشل تحميل {ext}: {e}")
         
-        # مزامنة أوامر السلاش مرة واحدة فقط
+        # مزامنة أوامر السلاش (Slash Commands)
         await self.tree.sync()
         print("🚀 تم مزامنة الأوامر وبدء البوت بنجاح!")
 
@@ -36,9 +36,12 @@ bot = MyBot()
 
 @bot.event
 async def on_ready():
-    # هنا لا تضع أي شيء سوى رسالة الترحيب (لا تضع load_extension هنا أبداً)
+    # لا تضع أي عمليات تحميل هنا، فقط رسالة تأكيد
     print(f"🔥 {bot.user} يعمل الآن بكامل قوته!")
 
-# تشغيل البوت
-bot.run("YOUR_TOKEN_HERE") # استبدل هذا بالتوكن الخاص بك
-ض
+# تشغيل البوت باستخدام التوكن من Railway Variables
+token = os.getenv("TOKEN")
+if token:
+    bot.run(token)
+else:
+    print("❌ خطأ: لم يتم العثور على التوكن في Railway Variables! تأكد من تسميته TOKEN")
