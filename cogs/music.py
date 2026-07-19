@@ -9,7 +9,7 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # ربط البوت بـ Lavalink باستخدام المتغيرات الصحيحة من Railway
+        # ربط البوت بـ Lavalink
         node = wavelink.Node(
             uri=f"http://{os.getenv('LAVALINK_HOST')}:{os.getenv('LAVALINK_PORT')}",
             password=os.getenv('LAVALINK_SERVER_PASSWORD')
@@ -27,8 +27,9 @@ class Music(commands.Cog):
         if not vc:
             vc = await ctx.author.voice.channel.connect(cls=wavelink.Player)
 
-        # البحث عن الأغنية
-        tracks = await wavelink.Playable.search(search)
+        # التعديل: استخدام ytsearch لتخطي حظر يوتيوب
+        tracks = await wavelink.Playable.search(f"ytsearch:{search}")
+        
         if not tracks:
             return await ctx.send("🔍 | للأسف ما لقيت شي بهذا الاسم.")
         
@@ -40,7 +41,7 @@ class Music(commands.Cog):
     async def stop(self, ctx):
         """أمر إيقاف الموسيقى"""
         if ctx.voice_client:
-            await ctx.flush() # تنظيف الكيوت
+            # تم حذف ctx.flush() لأنه يسبب خطأ
             await ctx.voice_client.disconnect()
             await ctx.send("⏹️ | تم إيقاف الموسيقى والخروج من القناة.")
 
