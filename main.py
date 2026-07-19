@@ -3,9 +3,11 @@ import discord
 import asyncio
 from discord.ext import commands
 
+# 1. تعريف الـ intents والـ bot في البداية
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=bot.intents) # تأكد أن الـ intents معرفة
+bot = commands.Bot(command_prefix="!", intents=intents)
 
+# 2. قائمة الملفات
 extensions = [
     "cogs.logs", "cogs.tickets", "cogs.Admin", "cogs.staff_review", 
     "cogs.warnings", "cogs.welcome", "cogs.events", "cogs.moderation", 
@@ -14,25 +16,22 @@ extensions = [
     "cogs.giveaway", "cogs.levels"
 ]
 
-# 1. تعريف وظيفة التحميل "خارج" أي حدث
-async def load_all_extensions():
+# 3. دالة التحميل
+async def load_all():
     for ext in extensions:
         try:
             await bot.load_extension(ext)
             print(f"✅ تم تحميل: {ext}")
         except Exception as e:
-            print(f"❌ فشل تحميل {ext}: {e}")
+            print(f"❌ خطأ في {ext}: {e}")
 
-# 2. الحدث الوحيد للتشغيل
 @bot.event
 async def on_ready():
-    print(f"🔥 {bot.user} متصل ويعمل الآن بكامل طاقته!")
+    print(f"🔥 {bot.user} يعمل الآن!")
 
-# 3. الوظيفة الأساسية التي تبدأ كل شيء
 async def main():
     async with bot:
-        print("🚀 جاري تهيئة البوت...")
-        await load_all_extensions() # تحميل الملفات مرة واحدة فقط قبل الاتصال
+        await load_all()
         token = os.getenv("TOKEN")
         await bot.start(token)
 
