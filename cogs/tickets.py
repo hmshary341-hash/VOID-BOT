@@ -6,9 +6,41 @@ from datetime import datetime
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
 STAFF_ROLE_ID = 1527807423186862080
-IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528188543321505833/file_00000000da1c71f4863b28202a995e4e.png"
+IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
 
-# --- نافذة البيانات (Modal) للشكاوى ---
+# --- 1. الأزرار (استلام / قفل / حذف) ---
+class TicketActions(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.claimed_by = None
+
+    @discord.ui.button(label="استلام التذكرة", style=discord.ButtonStyle.primary, emoji="✅", custom_id="claim_ticket")
+    async def claim(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.claimed_by:
+            await interaction.response.send_message(f"⚠️ هذه التذكرة مستلمة بالفعل بواسطة {self.claimed_by.mention}", ephemeral=True)
+            return
+        
+        self.claimed_by = interaction.user
+        button.disabled = True
+        
+        embed = interaction.message.embeds[0]
+        embed.add_field(name="🛡️ مستلمة بواسطة", value=interaction.user.mention, inline=False)
+        embed.color = discord.Color.green()
+        
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.response.send_message(f"✅ تم استلام التذكرة بواسطة {interaction.user.mention}")
+
+    @discord.ui.button(label="قفل", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="lock_ticket")
+    async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.channel.set_permissions(interaction.user, send_messages=False)
+        await interaction.response.send_message("🔒 تم قفل التذكرة.")
+
+    @discord.ui.button(label="حذف", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="delete_ticket")
+    async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🗑️ جاري الحذف...", ephemeral=True)
+        await interaction.channel.delete()
+
+# --- 2. نافذة البيانات للشكاوى ---
 class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     target = discord.ui.TextInput(label='يوزر الشخص المبلغ عنه', style=discord.TextStyle.short, required=True)
     reason = discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph, required=True)
@@ -19,7 +51,6 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         self.report_type = report_type
 
     async def on_submit(self, interaction: discord.Interaction):
-        # إنشاء القناة
         category = interaction.guild.get_channel(CATEGORY_ID)
         channel = await interaction.guild.create_text_channel(name=f"ticket-{interaction.user.name}", category=category)
         
@@ -28,29 +59,28 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
 
         embed = discord.Embed(title=f"تذكرة {self.report_type}", color=discord.Color.red())
         embed.add_field(name="👤 المشتكي", value=interaction.user.mention, inline=False)
-        embed.add_field(name="Target", value=self.target.value, inline=False)
+        embed.add_field(name="المبلغ عنه", value=self.target.value, inline=False)
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
         embed.set_image(url=IMAGE_URL)
 
-        await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed)
+        await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions())
         await interaction.response.send_message(f"✅ تم فتح تذكرتك: {channel.mention}", ephemeral=True)
 
-# --- القائمة المنسدلة ---
+# --- 3. القائمة المنسدلة ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         options = [
-            discord.SelectOption(label='إبلاغ عن إداري', value='admin_report', emoji='🛡️'),
-            discord.SelectOption(label='إبلاغ عن عضو', value='member_report', emoji='👤'),
-            discord.SelectOption(label='استفسار', value='inquiry', emoji='❓'),
+            discord.SelectOption(label='إبلاغ عن إداري', value='إبلاغ عن إداري', emoji='🛡️'),
+            discord.SelectOption(label='إبلاغ عن عضو', value='إبلاغ عن عضو', emoji='👤'),
+            discord.SelectOption(label='استفسار', value='استفسار', emoji='❓'),
         ]
         super().__init__(placeholder='اختر نوع التذكرة...', options=options, custom_id="ticket_select")
 
     async def callback(self, interaction: discord.Interaction):
-        if self.values[0] in ['admin_report', 'member_report']:
+        if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
             await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
         else:
-            # معالجة الاستفسار العادي
             await interaction.response.send_message("تم فتح تذكرة استفسار...", ephemeral=True)
 
 class OpenTicketView(discord.ui.View):
@@ -58,6 +88,7 @@ class OpenTicketView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
+# --- 4. أمر البوت ---
 class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
