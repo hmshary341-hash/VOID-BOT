@@ -21,7 +21,7 @@ class Admin(commands.Cog):
             await log_channel.send(embed=embed)
 
     # --- أوامر الإدارة الأساسية ---
-    @app_commands.command(name="سدها", description="إسكات عضو")
+    @app_commands.command(name="سدها", description="إسكات عضو (تايم أوت)")
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
         await member.timeout(datetime.timedelta(minutes=minutes), reason=reason)
         await interaction.response.send_message(f"🔇 تم إسكات {member.mention}.", ephemeral=True)
@@ -33,13 +33,13 @@ class Admin(commands.Cog):
         await interaction.response.send_message(f"🦵 تم طرد {member.mention}.", ephemeral=True)
         await self.send_log(interaction.guild, "طرد", member, interaction.user, f"السبب: {reason}")
 
-    @app_commands.command(name="القم", description="حظر عضو")
+    @app_commands.command(name="القم", description="حظر عضو (باند)")
     async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await member.ban(reason=reason)
         await interaction.response.send_message(f"🔨 تم حظر {member.mention}.", ephemeral=True)
         await self.send_log(interaction.guild, "حظر", member, interaction.user, f"السبب: {reason}")
 
-    @app_commands.command(name="فكها", description="إلغاء عقوبة")
+    @app_commands.command(name="فكها", description="إلغاء عقوبة (اكتب تايم أو باند)")
     async def unban_or_timeout(self, interaction: discord.Interaction, نوع: str, id_او_منشن: str):
         target_id = int(id_او_منشن.strip('<@!>'))
         if نوع == "تايم":
@@ -57,10 +57,20 @@ class Admin(commands.Cog):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
         await interaction.response.send_message("🔒 تم قفل القناة.", ephemeral=True)
 
-    @app_commands.command(name="فتح", description="فتح القناة الحالية")
+    @app_commands.command(name="افتح", description="فتح القناة الحالية")
     async def unlock(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
         await interaction.response.send_message("🔓 تم فتح القناة.", ephemeral=True)
+
+    @app_commands.command(name="اخفها", description="إخفاء القناة عن الأعضاء")
+    async def hide(self, interaction: discord.Interaction):
+        await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
+        await interaction.response.send_message("🙈 تم إخفاء القناة.", ephemeral=True)
+
+    @app_commands.command(name="ظهرها", description="إظهار القناة للأعضاء")
+    async def show(self, interaction: discord.Interaction):
+        await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
+        await interaction.response.send_message("👁️ تم إظهار القناة.", ephemeral=True)
 
     # --- أوامر المعلومات ---
     @app_commands.command(name="يوزر", description="معلومات عضو")
