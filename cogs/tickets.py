@@ -4,6 +4,7 @@ from discord.ext import commands
 import io
 import chat_exporter
 import random
+from datetime import datetime # تمت الإضافة
 
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
@@ -11,10 +12,11 @@ STAFF_ROLE_ID = 1527807423186862080
 LOG_CHANNEL_ID = 1527750890952462408
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
 
-# --- الأزرار الخاصة داخل التذكرة (مستمرة) ---
+# --- الأزرار الخاصة داخل التذكرة ---
 class TicketActions(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None) # هام جداً لعدم انتهاء الصلاحية
+    def __init__(self, opener): # أضفنا opener لاستقبال العضو
+        super().__init__(timeout=None)
+        self.opener = opener
         self.claimed_by = None
 
     @discord.ui.button(label="استلام التذكرة", style=discord.ButtonStyle.primary, emoji="✅", custom_id="claim_ticket")
@@ -36,20 +38,33 @@ class TicketActions(discord.ui.View):
 
     @discord.ui.button(label="حذف", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="delete_ticket")
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("🗑️ جاري حذف التذكرة...", ephemeral=True)
+        await interaction.response.defer()
+        
+        # 1. إرسال اللوج باستخدام الكوج
+        logs_cog = interaction.client.get_cog("Logs")
+        if logs_cog:
+            await logs_cog.send_ticket_log(
+                ticket_name=interaction.channel.name,
+                opener=self.opener,
+                claimer=self.claimed_by,
+                closer=interaction.user,
+                open_time=interaction.channel.created_at,
+                close_time=datetime.now(),
+                reason="تم حذف التذكرة",
+                transcript_url="https://transcript-service.com/" # يمكنك وضع رابط أو إبقاؤه نصي
+            )
+
+        # 2. التوثيق الأصلي (Chat Exporter)
         transcript = await chat_exporter.export(interaction.channel)
         transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{interaction.channel.name}.html")
         
         log_channel = interaction.guild.get_channel(LOG_CHANNEL_ID)
         if log_channel:
-            embed = discord.Embed(title="🗑️ حذف تذكرة وتوثيقها", color=discord.Color.red())
-            embed.add_field(name="القناة", value=interaction.channel.name, inline=True)
-            embed.add_field(name="بواسطة", value=interaction.user.mention, inline=True)
-            await log_channel.send(embed=embed, file=transcript_file)
+            await log_channel.send(file=transcript_file)
             
         await interaction.channel.delete()
 
-# --- المودال (النموذج) ---
+# --- المودال ---
 class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     target = discord.ui.TextInput(label='يوزر الشخص المبلغ عنه', style=discord.TextStyle.short, required=True)
     reason = discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph, required=True)
@@ -73,7 +88,9 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
         embed.set_image(url=IMAGE_URL)
-        await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions())
+        
+        # تمرير opener (interaction.user) إلى الـ View
+        await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions(opener=interaction.user))
         await interaction.followup.send(f"✅ تم فتح تذكرتك: {channel.mention}", ephemeral=True)
 
 # --- قائمة الاختيار ---
@@ -83,7 +100,7 @@ class TicketSelect(discord.ui.Select):
             discord.SelectOption(label='إبلاغ عن إداري', value='إبلاغ عن إداري', emoji='🛡️'),
             discord.SelectOption(label='إبلاغ عن عضو', value='إبلاغ عن عضو', emoji='👤'),
             discord.SelectOption(label='استفسار', value='استفسار', emoji='❓'),
-        ], custom_id="ticket_select_persistent") # custom_id ثابت
+        ], custom_id="ticket_select_persistent")
 
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
@@ -93,7 +110,7 @@ class TicketSelect(discord.ui.Select):
 
 class OpenTicketView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # مستمر
+        super().__init__(timeout=None)
         self.add_item(TicketSelect())
 
 class Tickets(commands.Cog):
