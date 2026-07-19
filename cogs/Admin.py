@@ -1,11 +1,11 @@
-Import discord
+import discord
 from discord import app_commands
 from discord.ext import commands
 import datetime
 
 # --- الإعدادات ---
-PRISON_ROLE_ID = 1526011928433135810
-LOG_CHANNEL_ID = 1526625037808046241
+PRISON_ROLE_ID = 1527936774566056097
+LOG_CHANNEL_ID = 1527936774566056097
 
 class Admin(commands.Cog):
     def __init__(self, bot):
@@ -20,7 +20,7 @@ class Admin(commands.Cog):
             embed.add_field(name="📝 التفاصيل", value=details, inline=False)
             await log_channel.send(embed=embed)
 
-    # --- أوامر الإدارة الأساسية (من كودك) ---
+    # --- أوامر الإدارة الأساسية ---
     @app_commands.command(name="سدها", description="إسكات عضو (تايم أوت)")
     @app_commands.checks.has_permissions(moderate_members=True)
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
@@ -80,7 +80,7 @@ class Admin(commands.Cog):
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.response.send_message("👁️ تم إظهار القناة.", ephemeral=True)
 
-    # --- أوامر الصيانة (التي نحتاجها للتحكم) ---
+    # --- أوامر الصيانة ---
     @app_commands.command(name="sync", description="تحديث أوامر السلاش (للمطورين فقط)")
     @app_commands.checks.has_permissions(administrator=True)
     async def sync(self, interaction: discord.Interaction):
