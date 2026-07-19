@@ -1,71 +1,51 @@
 import discord
 from discord.ext import commands
 
-
-WELCOME_CHANNEL = 1525595451607486535
-GOODBYE_CHANNEL = 1527103575946297415
-THE_VOID_ROLE = 1526653269743767562
-
-
 class Welcome(commands.Cog):
-
     def __init__(self, bot):
         self.bot = bot
-
+        self.welcome_channel_id = 1525595451607486535
+        self.leave_channel_id = 1527103575946297415
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-
-        role = member.guild.get_role(
-            THE_VOID_ROLE
-        )
-
-        if role:
-            await member.add_roles(role)
-
-
-        channel = self.bot.get_channel(
-            WELCOME_CHANNEL
-        )
-
+        channel = self.bot.get_channel(self.welcome_channel_id)
         if channel:
-
             embed = discord.Embed(
-                title="🖤 WELCOME TO VOID",
+                title="✨ Welcome to VOID",
                 description=(
-                    f"أهلاً بك {member.mention} 💜\n\n"
-                    "نتمنى لك وقت ممتع معنا."
+                    f"أهلاً بك {member.mention} في سيرفر VOID! 🖤\n\n"
+                    "يسعدنا انضمامك إلينا، ونتمنى لك تجربة ممتعة بين أفراد مجتمعنا.\n\n"
+                    "**قبل أن تبدأ:**\n"
+                    "・📜 اطلع على القوانين.\n"
+                    "・🎭 اختر الرتب المناسبة لك.\n"
+                    "・💬 شارك في الدردشة وتعرّف على الجميع.\n"
+                    "・🎉 استمتع بالفعاليات والجوائز والمزايا الموجودة في السيرفر.\n\n"
+                    "نتمنى لك وقتًا مليئًا بالمتعة والتفاعل.\n\n"
+                    "أهلًا بك في عائلة VOID. 🌙"
                 ),
-                color=0x8000FF
+                color=discord.Color.dark_gray()
             )
-
-            await channel.send(
-                embed=embed
-            )
-
+            embed.set_thumbnail(url=member.display_avatar.url)
+            embed.set_footer(text=f"العضو رقم: {member.guild.member_count}")
+            await channel.send(embed=embed)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-
-        channel = self.bot.get_channel(
-            GOODBYE_CHANNEL
-        )
-
+        channel = self.bot.get_channel(self.leave_channel_id)
         if channel:
-
             embed = discord.Embed(
-                title="🖤 GOODBYE",
+                title="🌑 Goodbye",
                 description=(
-                    f"غادر السيرفر {member.mention}\n\n"
-                    "نتمنى رؤيتك مرة أخرى 💜"
+                    f"لقد غادر {member.display_name} السيرفر.\n\n"
+                    "شكرًا لك على الوقت الذي قضيته معنا، ونتمنى لك كل التوفيق في رحلتك القادمة.\n\n"
+                    "ستبقى أبواب VOID مفتوحة دائمًا إن قررت العودة يومًا ما.\n\n"
+                    "نتمنى لك كل الخير، وإلى اللقاء. 🖤"
                 ),
-                color=0x8000FF
+                color=discord.Color.dark_gray()
             )
-
-            await channel.send(
-                embed=embed
-            )
-
+            embed.set_thumbnail(url=member.display_avatar.url)
+            await channel.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Welcome(bot))
