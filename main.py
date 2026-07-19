@@ -3,20 +3,18 @@ import discord
 import asyncio
 from discord.ext import commands
 
-# 1. تعريف الـ intents والـ bot في البداية
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# 2. قائمة الملفات
+# تم حذف "cogs.levels" من القائمة أدناه
 extensions = [
     "cogs.logs", "cogs.tickets", "cogs.Admin", "cogs.staff_review", 
     "cogs.warnings", "cogs.welcome", "cogs.events", "cogs.moderation", 
     "cogs.rules", "cogs.AutoDivider", "cogs.suggestions", "cogs.anti_raid", 
     "cogs.stats", "cogs.general", "cogs.anti_nuke", "cogs.security", 
-    "cogs.giveaway", "cogs.levels"
+    "cogs.giveaway"
 ]
 
-# 3. دالة التحميل
 async def load_all():
     for ext in extensions:
         try:
@@ -27,7 +25,7 @@ async def load_all():
 
 @bot.event
 async def on_ready():
-    print(f"🔥 {bot.user} يعمل الآن!")
+    print(f"🔥 {bot.user} متصل ويعمل بثبات!")
 
 async def main():
     async with bot:
