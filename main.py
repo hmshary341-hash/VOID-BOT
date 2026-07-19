@@ -9,6 +9,14 @@ intents = discord.Intents.all()
 # تعريف البوت
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# إضافة حدث on_ready (يتم تنفيذه عند تشغيل البوت)
+@bot.event
+async def on_ready():
+    # هذا السطر هو الذي سيجعل أوامر السلاش (/) تظهر في ديسكورد
+    await bot.tree.sync()
+    print(f"✅ تم تسجيل الدخول كـ {bot.user}")
+    print(f"✅ تمت مزامنة أوامر السلاش (Slash Commands) بنجاح!")
+
 async def load_extensions():
     # هذا اللوب سيحمل كل الملفات الموجودة في مجلد cogs تلقائياً
     if os.path.exists('./cogs'):
