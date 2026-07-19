@@ -4,7 +4,7 @@ from discord.ext import commands
 import io
 import chat_exporter
 import random
-from datetime import datetime # تمت الإضافة
+from datetime import datetime
 
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
@@ -14,7 +14,7 @@ IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/15281909
 
 # --- الأزرار الخاصة داخل التذكرة ---
 class TicketActions(discord.ui.View):
-    def __init__(self, opener): # أضفنا opener لاستقبال العضو
+    def __init__(self, opener=None): # تم إضافة =None ليعمل الكود في main.py
         super().__init__(timeout=None)
         self.opener = opener
         self.claimed_by = None
@@ -40,21 +40,23 @@ class TicketActions(discord.ui.View):
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         
-        # 1. إرسال اللوج باستخدام الكوج
+        # 1. إرسال اللوج عبر كوج اللوجز
         logs_cog = interaction.client.get_cog("Logs")
         if logs_cog:
+            # إذا لم يتم تعيين opener (بسبب إعادة تشغيل البوت)، نستخدم صاحب التكت من القناة إذا أمكن
+            opener_user = self.opener if self.opener else interaction.user 
             await logs_cog.send_ticket_log(
                 ticket_name=interaction.channel.name,
-                opener=self.opener,
+                opener=opener_user,
                 claimer=self.claimed_by,
                 closer=interaction.user,
                 open_time=interaction.channel.created_at,
                 close_time=datetime.now(),
                 reason="تم حذف التذكرة",
-                transcript_url="https://transcript-service.com/" # يمكنك وضع رابط أو إبقاؤه نصي
+                transcript_url="https://transcript-service.com/"
             )
 
-        # 2. التوثيق الأصلي (Chat Exporter)
+        # 2. التوثيق (Chat Exporter)
         transcript = await chat_exporter.export(interaction.channel)
         transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{interaction.channel.name}.html")
         
@@ -89,7 +91,6 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
         embed.set_image(url=IMAGE_URL)
         
-        # تمرير opener (interaction.user) إلى الـ View
         await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions(opener=interaction.user))
         await interaction.followup.send(f"✅ تم فتح تذكرتك: {channel.mention}", ephemeral=True)
 
