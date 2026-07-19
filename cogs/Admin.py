@@ -20,26 +20,30 @@ class Admin(commands.Cog):
             embed.add_field(name="📝 التفاصيل", value=details, inline=False)
             await log_channel.send(embed=embed)
 
-    # --- أوامر الإدارة الأساسية ---
+    # --- أوامر الإدارة الأساسية (من كودك) ---
     @app_commands.command(name="سدها", description="إسكات عضو (تايم أوت)")
+    @app_commands.checks.has_permissions(moderate_members=True)
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
         await member.timeout(datetime.timedelta(minutes=minutes), reason=reason)
         await interaction.response.send_message(f"🔇 تم إسكات {member.mention}.", ephemeral=True)
         await self.send_log(interaction.guild, "تايم أوت", member, interaction.user, f"المدة: {minutes} دقيقة")
 
     @app_commands.command(name="سقها", description="طرد عضو")
+    @app_commands.checks.has_permissions(kick_members=True)
     async def kick(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await member.kick(reason=reason)
         await interaction.response.send_message(f"🦵 تم طرد {member.mention}.", ephemeral=True)
         await self.send_log(interaction.guild, "طرد", member, interaction.user, f"السبب: {reason}")
 
     @app_commands.command(name="القم", description="حظر عضو (باند)")
+    @app_commands.checks.has_permissions(ban_members=True)
     async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await member.ban(reason=reason)
         await interaction.response.send_message(f"🔨 تم حظر {member.mention}.", ephemeral=True)
         await self.send_log(interaction.guild, "حظر", member, interaction.user, f"السبب: {reason}")
 
     @app_commands.command(name="فكها", description="إلغاء عقوبة (اكتب تايم أو باند)")
+    @app_commands.checks.has_permissions(administrator=True)
     async def unban_or_timeout(self, interaction: discord.Interaction, نوع: str, id_او_منشن: str):
         target_id = int(id_او_منشن.strip('<@!>'))
         if نوع == "تايم":
@@ -53,24 +57,52 @@ class Admin(commands.Cog):
 
     # --- أوامر التحكم بالقنوات ---
     @app_commands.command(name="قفل", description="قفل القناة الحالية")
+    @app_commands.checks.has_permissions(manage_channels=True)
     async def lock(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
         await interaction.response.send_message("🔒 تم قفل القناة.", ephemeral=True)
 
     @app_commands.command(name="افتح", description="فتح القناة الحالية")
+    @app_commands.checks.has_permissions(manage_channels=True)
     async def unlock(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
         await interaction.response.send_message("🔓 تم فتح القناة.", ephemeral=True)
 
     @app_commands.command(name="اخفها", description="إخفاء القناة عن الأعضاء")
+    @app_commands.checks.has_permissions(manage_channels=True)
     async def hide(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
         await interaction.response.send_message("🙈 تم إخفاء القناة.", ephemeral=True)
 
     @app_commands.command(name="ظهرها", description="إظهار القناة للأعضاء")
+    @app_commands.checks.has_permissions(manage_channels=True)
     async def show(self, interaction: discord.Interaction):
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.response.send_message("👁️ تم إظهار القناة.", ephemeral=True)
+
+    # --- أوامر الصيانة (التي نحتاجها للتحكم) ---
+    @app_commands.command(name="sync", description="تحديث أوامر السلاش (للمطورين فقط)")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def sync(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        synced = await self.bot.tree.sync()
+        await interaction.followup.send(f"✅ تم تحديث {len(synced)} أمر في السيرفر!")
+
+    @app_commands.command(name="clear", description="حذف عدد معين من الرسائل")
+    @app_commands.checks.has_permissions(manage_messages=True)
+    async def clear(self, interaction: discord.Interaction, amount: int):
+        await interaction.response.defer(ephemeral=True)
+        deleted = await interaction.channel.purge(limit=amount)
+        await interaction.followup.send(f"تم حذف {len(deleted)} رسالة.", ephemeral=True)
+
+    @app_commands.command(name="reload", description="إعادة تحميل ملف برمجياً")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def reload(self, interaction: discord.Interaction, cog: str):
+        try:
+            await self.bot.reload_extension(f"cogs.{cog}")
+            await interaction.response.send_message(f"✅ تم إعادة تحميل `cogs.{cog}` بنجاح.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ فشل: {e}", ephemeral=True)
 
     # --- أوامر المعلومات ---
     @app_commands.command(name="يوزر", description="معلومات عضو")
@@ -89,12 +121,14 @@ class Admin(commands.Cog):
 
     # --- أوامر متنوعة ---
     @app_commands.command(name="اعلان", description="إرسال إعلان")
-    async def announce(self, interaction: discord.Interaction, العنوان: str, المحتوى: str):
-        embed = discord.Embed(title=f"📢 {العنوان}", description=المحتوى, color=discord.Color.gold())
+    @app_commands.checks.has_permissions(administrator=True)
+    async def announce(self, interaction: discord.Interaction, عنوان: str, محتوى: str):
+        embed = discord.Embed(title=f"📢 {عنوان}", description=محتوى, color=discord.Color.gold())
         await interaction.channel.send(embed=embed)
         await interaction.response.send_message("✅ تم إرسال الإعلان.", ephemeral=True)
 
     @app_commands.command(name="سجن", description="سجن عضو")
+    @app_commands.checks.has_permissions(manage_roles=True)
     async def prison(self, interaction: discord.Interaction, member: discord.Member):
         role = interaction.guild.get_role(PRISON_ROLE_ID)
         await member.add_roles(role)
@@ -102,6 +136,7 @@ class Admin(commands.Cog):
         await self.send_log(interaction.guild, "سجن", member, interaction.user, "تم تقييده برتبة السجين.")
 
     @app_commands.command(name="افراج", description="إفراج عن عضو")
+    @app_commands.checks.has_permissions(manage_roles=True)
     async def unprison(self, interaction: discord.Interaction, member: discord.Member):
         role = interaction.guild.get_role(PRISON_ROLE_ID)
         await member.remove_roles(role)
