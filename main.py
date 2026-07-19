@@ -1,34 +1,49 @@
 import discord
-from discord.ext import commands
-import asyncio
 import os
+import asyncio
+from discord.ext import commands
+from dotenv import load_dotenv
 
+# تحميل المتغيرات من ملف .env (أو متغيرات Railway)
+load_dotenv()
+TOKEN = os.getenv("TOKEN")
+
+# إعداد الصلاحيات (Intents)
 intents = discord.Intents.default()
-intents.members = True
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-async def load_extensions():
-    # تحميل الملفات من مجلد cogs
-    await bot.load_extension("cogs.admin")
-    await bot.load_extension("cogs.tickets")
-    print("✅ تم تحميل الملفات بنجاح!")
-
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    print(f"🚀 البوت {bot.user} متصل الآن!")
+    print(f'✅ البوت يعمل الآن: {bot.user}')
+    try:
+        synced = await bot.tree.sync()
+        print(f'🔄 تم مزامنة {len(synced)} أمر.')
+    except Exception as e:
+        print(f'❌ خطأ في المزامنة: {e}')
+
+async def load_extensions():
+    # هذا الجزء يبحث تلقائياً عن أي ملف .py داخل مجلد cogs
+    path = './cogs'
+    if not os.path.exists(path):
+        print(f"⚠️ المجلد {path} غير موجود!")
+        return
+
+    for filename in os.listdir(path):
+        if filename.endswith('.py') and filename != '__init__.py':
+            extension_name = f'cogs.{filename[:-3]}'
+            try:
+                await bot.load_extension(extension_name)
+                print(f'📂 تم تحميل: {extension_name}')
+            except Exception as e:
+                print(f'❌ فشل تحميل {extension_name}: {e}')
 
 async def main():
     async with bot:
         await load_extensions()
-        # هنا سيقرأ التوكن من Variables التي وضعتها في الموقع
-        token = os.getenv("TOKEN")
-        if not token:
-            print("❌ خطأ: لم يتم العثور على التوكن في المتغيرات!")
-            return
-        await bot.start(token)
+        await bot.start(TOKEN)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(main())
