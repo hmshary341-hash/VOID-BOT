@@ -1,42 +1,33 @@
 import discord
 from discord.ext import commands
-import os
 import asyncio
 
 intents = discord.Intents.default()
-intents.message_content = True
 intents.members = True
+intents.message_content = True
 
-class MyBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-    async def setup_hook(self):
-        # تحميل جميع الملفات من مجلد cogs
-        for file in os.listdir("./cogs"):
-            if file.endswith(".py"):
-                try:
-                    await self.load_extension(f"cogs.{file[:-3]}")
-                    print(f"📦 تم تحميل: {file}")
-                except Exception as e:
-                    print(f"❌ خطأ في {file}: {e}")
-        
-        # المزامنة الإجبارية للأوامر لتظهر في ديسكورد
-        await self.tree.sync()
-        print("✅ تم مزامنة الأوامر مع ديسكورد بنجاح!")
-
-bot = MyBot()
+async def load_extensions():
+    try:
+        await bot.load_extension("cogs.admin")
+        await bot.load_extension("cogs.tickets")
+        print("✅ تم تحميل ملفات الأوامر (admin, tickets)")
+    except Exception as e:
+        print(f"❌ خطأ أثناء تحميل الملفات: {e}")
 
 @bot.event
 async def on_ready():
-    print(f"✅ البوت يعمل الآن: {bot.user}")
+    await bot.tree.sync()
+    print(f"🚀 البوت {bot.user} جاهز الآن!")
 
 async def main():
-    token = os.getenv("TOKEN")
-    if not token:
-        print("❌ خطأ: لم يتم العثور على TOKEN")
-        return
-    await bot.start(token)
+    # بدلاً من وضع التوكن في الكود، سنطلبه من المستخدم عند التشغيل
+    token = input("يرجى إدخال توكن البوت الخاص بك: ").strip()
+    
+    async with bot:
+        await load_extensions()
+        await bot.start(token)
 
 if __name__ == "__main__":
     asyncio.run(main())
