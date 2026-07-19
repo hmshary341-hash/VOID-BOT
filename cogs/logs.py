@@ -1,58 +1,67 @@
-const { Client, GatewayIntentBits, Events, EmbedBuilder } = require('discord.js');
+import discord
+from discord.ext import commands
+from discord.ui import View, Button
+from datetime import datetime
 
-// إعدادات البوت مع الـ Intents الضرورية
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
-});
+class Logs(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.msg_log_id = 1526625037808046241    # قناة لوق الرسائل
+        self.ticket_log_id = 1527750890952462408 # قناة لوق التكت
 
-// أيدي قناة اللوج
-const LOG_CHANNEL_ID = '1526625037808046241';
+    def is_ticket_channel(self, channel):
+        # يتحقق إذا كان اسم القناة يحتوي على "ticket"
+        return "ticket" in channel.name.lower()
 
-// دالة التحقق من قنوات التكت
-function isTicketChannel(channel) {
-    return channel.name && channel.name.toLowerCase().includes('ticket');
-}
+    # --- 1. تسجيل حذف الرسائل ---
+    @commands.Cog.listener()
+    async def on_message_delete(self, message):
+        if message.author.bot or not message.guild or self.is_ticket_channel(message.channel): return
+        
+        channel = self.bot.get_channel(self.msg_log_id)
+        if not channel: return
 
-// 1. تسجيل الرسائل المحذوفة
-client.on(Events.MessageDelete, async (message) => {
-    if (!message.guild || message.author?.bot || isTicketChannel(message.channel)) return;
+        embed = discord.Embed(title="🗑️ رسالة محذوفة", color=discord.Color.red())
+        embed.set_author(name=message.author.name, icon_url=message.author.display_avatar.url)
+        embed.add_field(name="المحتوى:", value=message.content or "*(رسالة فارغة أو وسائط)*")
+        embed.set_timestamp()
+        
+        await channel.send(embed=embed)
 
-    const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (!logChannel) return;
+    # --- 2. تسجيل الرسائل المعدلة ---
+    @commands.Cog.listener()
+    async def on_message_edit(self, before, after):
+        if before.author.bot or not before.guild or before.content == after.content or self.is_ticket_channel(before.channel): return
+        
+        channel = self.bot.get_channel(self.msg_log_id)
+        if not channel: return
 
-    const embed = new EmbedBuilder()
-        .setTitle('🗑️ رسالة محذوفة')
-        .setColor('Red')
-        .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
-        .addFields({ name: 'المحتوى:', value: message.content || '*(رسالة فارغة أو وسائط)*' })
-        .setTimestamp();
+        embed = discord.Embed(title="✏️ رسالة معدلة", color=discord.Color.gold())
+        embed.set_author(name=before.author.name, icon_url=before.author.display_avatar.url)
+        embed.add_field(name="قبل التعديل:", value=before.content or "*(رسالة فارغة)*")
+        embed.add_field(name="بعد التعديل:", value=after.content or "*(رسالة فارغة)*")
+        embed.set_timestamp()
+        
+        await channel.send(embed=embed)
 
-    logChannel.send({ embeds: [embed] }).catch(console.error);
-});
+    # --- 3. لوق التكت (الذي طلبته سابقاً) ---
+    async def send_ticket_log(self, ticket_name, opener, claimer, closer, open_time, close_time, reason, transcript_url):
+        channel_log = self.bot.get_channel(self.ticket_log_id)
+        if not channel_log: return
 
-// 2. تسجيل الرسائل المعدلة
-client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
-    if (!newMessage.guild || newMessage.author?.bot || oldMessage.content === newMessage.content || isTicketChannel(newMessage.channel)) return;
+        embed = discord.Embed(title="تم إغلاق التذكرة", color=discord.Color.dark_theme())
+        embed.add_field(name="اسم التذكرة", value=ticket_name, inline=False)
+        embed.add_field(name="تم الفتح بواسطة", value=opener.mention, inline=False)
+        embed.add_field(name="تم المطالبة بواسطة", value=claimer.mention if claimer else "لم يتم المطالبة", inline=False)
+        embed.add_field(name="تم الإغلاق بواسطة", value=closer.mention, inline=False)
+        embed.add_field(name="وقت الفتح", value=f"<t:{int(open_time.timestamp())}:F>", inline=False)
+        embed.add_field(name="وقت الإغلاق", value=f"<t:{int(close_time.timestamp())}:F>", inline=False)
+        embed.add_field(name="سبب الإغلاق", value=reason or "لم يتم تقديم سبب", inline=False)
 
-    const logChannel = newMessage.guild.channels.cache.get(LOG_CHANNEL_ID);
-    if (!logChannel) return;
+        view = View()
+        view.add_item(Button(label="عرض التذكرة", url=transcript_url, style=discord.ButtonStyle.link))
+        
+        await channel_log.send(embed=embed, view=view)
 
-    const embed = new EmbedBuilder()
-        .setTitle('✏️ رسالة معدلة')
-        .setColor('Yellow')
-        .setAuthor({ name: newMessage.author.tag, iconURL: newMessage.author.displayAvatarURL() })
-        .addFields(
-            { name: 'قبل التعديل:', value: oldMessage.content || '*(رسالة فارغة)*' },
-            { name: 'بعد التعديل:', value: newMessage.content || '*(رسالة فارغة)*' }
-        )
-        .setTimestamp();
-
-    logChannel.send({ embeds: [embed] }).catch(console.error);
-});
-
-// تشغيل البوت باستخدام المتغير الموجود في Railway
-client.login(process.env.DISCORD_TOKEN);
+async def setup(bot):
+    await bot.add_cog(Logs(bot))
