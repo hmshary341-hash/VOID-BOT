@@ -3,15 +3,13 @@ from discord import app_commands
 from discord.ext import commands
 import io
 import chat_exporter
-import random # استبدلنا json بـ random
+import random
 
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
 STAFF_ROLE_ID = 1527807423186862080
 LOG_CHANNEL_ID = 1527750890952462408
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
-
-# حذفنا دالة get_next_ticket_number التي كانت تسبب المشكلة
 
 class TicketActions(discord.ui.View):
     def __init__(self):
@@ -63,7 +61,6 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
-            # استخدام رقم عشوائي بدلاً من الاعتماد على ملف خارجي
             ticket_num = random.randint(1000, 9999) 
             category = interaction.guild.get_channel(CATEGORY_ID)
             channel = await interaction.guild.create_text_channel(name=f"ticket-{ticket_num}", category=category)
@@ -94,7 +91,7 @@ class TicketSelect(discord.ui.Select):
         if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
             await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
         else:
-            await interaction.response.send_message("تم فتح تذكرة استفسار...", ephemeral=True)
+            await interaction.followup.send("تم فتح تذكرة استفسار...", ephemeral=True)
 
 class OpenTicketView(discord.ui.View):
     def __init__(self):
