@@ -1,31 +1,17 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
-import os
 import io
 import chat_exporter
+import random # استبدلنا json بـ random
 
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
 STAFF_ROLE_ID = 1527807423186862080
 LOG_CHANNEL_ID = 1527750890952462408
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
-FILE_PATH = "ticket_count.json"
 
-def get_next_ticket_number():
-    if not os.path.exists(FILE_PATH):
-        count = 1
-    else:
-        with open(FILE_PATH, "r") as f:
-            try:
-                data = json.load(f)
-                count = data.get("count", 1)
-            except:
-                count = 1
-    with open(FILE_PATH, "w") as f:
-        json.dump({"count": count + 1}, f)
-    return count
+# حذفنا دالة get_next_ticket_number التي كانت تسبب المشكلة
 
 class TicketActions(discord.ui.View):
     def __init__(self):
@@ -77,13 +63,14 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         try:
-            ticket_num = get_next_ticket_number()
+            # استخدام رقم عشوائي بدلاً من الاعتماد على ملف خارجي
+            ticket_num = random.randint(1000, 9999) 
             category = interaction.guild.get_channel(CATEGORY_ID)
-            channel = await interaction.guild.create_text_channel(name=f"ticket-{ticket_num:04d}", category=category)
+            channel = await interaction.guild.create_text_channel(name=f"ticket-{ticket_num}", category=category)
             await channel.set_permissions(interaction.guild.default_role, read_messages=False)
             await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
             
-            embed = discord.Embed(title=f"تذكرة {self.report_type} | #{ticket_num:04d}", color=discord.Color.dark_purple())
+            embed = discord.Embed(title=f"تذكرة {self.report_type} | #{ticket_num}", color=discord.Color.dark_purple())
             embed.add_field(name="👤 المشتكي", value=interaction.user.mention, inline=False)
             embed.add_field(name="المبلغ عنه", value=self.target.value, inline=False)
             embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
