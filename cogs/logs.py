@@ -1,48 +1,58 @@
-import discord
-from discord.ext import commands
-from datetime import datetime
+const { Client, GatewayIntentBits, Events, EmbedBuilder } = require('discord.js');
 
-# الأيدي الخاص بروم السجلات
-LOG_CHANNEL_ID = 1526625037808046241
+// إعدادات البوت مع الـ Intents الضرورية
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
+    ]
+});
 
-class Logs(commands.Cog):
-    def __init__(self, bot):
-        self.bot = bot
+// أيدي قناة اللوج
+const LOG_CHANNEL_ID = '1526625037808046241';
 
-    async def send_log(self, guild, title, color, description, avatar_url=None):
-        channel = guild.get_channel(LOG_CHANNEL_ID)
-        if not channel:
-            return
+// دالة التحقق من قنوات التكت
+function isTicketChannel(channel) {
+    return channel.name && channel.name.toLowerCase().includes('ticket');
+}
 
-        embed = discord.Embed(
-            title=title,
-            description=description,
-            color=color,
-            timestamp=datetime.utcnow()
+// 1. تسجيل الرسائل المحذوفة
+client.on(Events.MessageDelete, async (message) => {
+    if (!message.guild || message.author?.bot || isTicketChannel(message.channel)) return;
+
+    const logChannel = message.guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setTitle('🗑️ رسالة محذوفة')
+        .setColor('Red')
+        .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL() })
+        .addFields({ name: 'المحتوى:', value: message.content || '*(رسالة فارغة أو وسائط)*' })
+        .setTimestamp();
+
+    logChannel.send({ embeds: [embed] }).catch(console.error);
+});
+
+// 2. تسجيل الرسائل المعدلة
+client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+    if (!newMessage.guild || newMessage.author?.bot || oldMessage.content === newMessage.content || isTicketChannel(newMessage.channel)) return;
+
+    const logChannel = newMessage.guild.channels.cache.get(LOG_CHANNEL_ID);
+    if (!logChannel) return;
+
+    const embed = new EmbedBuilder()
+        .setTitle('✏️ رسالة معدلة')
+        .setColor('Yellow')
+        .setAuthor({ name: newMessage.author.tag, iconURL: newMessage.author.displayAvatarURL() })
+        .addFields(
+            { name: 'قبل التعديل:', value: oldMessage.content || '*(رسالة فارغة)*' },
+            { name: 'بعد التعديل:', value: newMessage.content || '*(رسالة فارغة)*' }
         )
-        if avatar_url:
-            embed.set_thumbnail(url=avatar_url)
-        embed.set_footer(text="VOID Security Logs")
-        
-        await channel.send(embed=embed)
+        .setTimestamp();
 
-    # 1. دخول عضو
-    @commands.Cog.listener()
-    async def on_member_join(self, member):
-        desc = f"👤 **Member**\n{member.mention}\n\n🕒 **Time**\n<t:{int(datetime.now().timestamp())}:f>"
-        await self.send_log(member.guild, "🟢 MEMBER JOINED", 0x00FF00, desc, member.display_avatar.url)
+    logChannel.send({ embeds: [embed] }).catch(console.error);
+});
 
-    # 2. خروج عضو
-    @commands.Cog.listener()
-    async def on_member_remove(self, member):
-        desc = f"👤 **Member**\n{member.name} ({member.id})\n\n🕒 **Time**\n<t:{int(datetime.now().timestamp())}:f>"
-        await self.send_log(member.guild, "🔴 MEMBER LEFT", 0xFF0000, desc, member.display_avatar.url)
-
-    # 3. حذف رول (اختياري)
-    @commands.Cog.listener()
-    async def on_guild_role_delete(self, role):
-        desc = f"🛡️ **Role Deleted**\n{role.name}\n\n🕒 **Time**\n<t:{int(datetime.now().timestamp())}:f>"
-        await self.send_log(role.guild, "🟡 ROLE DELETED", 0xFFD700, desc)
-
-async def setup(bot):
-    await bot.add_cog(Logs(bot))
+// تشغيل البوت باستخدام المتغير الموجود في Railway
+client.login(process.env.DISCORD_TOKEN);
