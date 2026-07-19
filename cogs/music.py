@@ -9,10 +9,10 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # ربط البوت بـ Lavalink باستخدام المتغيرات التي ضبطناها في Railway
+        # ربط البوت بـ Lavalink باستخدام المتغيرات الصحيحة من Railway
         node = wavelink.Node(
             uri=f"http://{os.getenv('LAVALINK_HOST')}:{os.getenv('LAVALINK_PORT')}",
-            password=os.getenv('LAVALINK_PASSWORD')
+            password=os.getenv('LAVALINK_SERVER_PASSWORD')
         )
         await wavelink.Pool.connect(nodes=[node], client=self.bot)
         print("✅ تم الاتصال بـ Lavalink بنجاح!")
@@ -40,6 +40,7 @@ class Music(commands.Cog):
     async def stop(self, ctx):
         """أمر إيقاف الموسيقى"""
         if ctx.voice_client:
+            await ctx.flush() # تنظيف الكيوت
             await ctx.voice_client.disconnect()
             await ctx.send("⏹️ | تم إيقاف الموسيقى والخروج من القناة.")
 
