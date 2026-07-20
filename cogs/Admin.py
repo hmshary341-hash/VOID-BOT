@@ -11,14 +11,11 @@ ADMIN_ROLE_ID = 1527513659704606740  # رتبة الإدارة المحددة
 # --- ديمو للتحقق من الصلاحية (الأدمن أو رتبة الإدارة المحددة) ---
 def admin_only():
     async def predicate(interaction: discord.Interaction):
-        # السماح للأدمن أو صاحب الصلاحية الكاملة
         if interaction.user.guild_permissions.administrator:
             return True
-        # السماح لمن يحمل الرتبة المحددة
         if any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles):
             return True
-        # إذا لم يكن أحدهما، تظهر له رسالة خطأ خاصة
-        await interaction.response.send_message("❌عذراً، هذا الأمر مخصص للمشرفين فقط.", ephemeral=True)
+        await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص للمشرفين فقط.", ephemeral=True)
         return False
     return app_commands.check(predicate)
 
@@ -95,13 +92,16 @@ class Admin(commands.Cog):
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.response.send_message("👁️ تم إظهار القناة.", ephemeral=True)
 
-    # --- أوامر الصيانة ---
-    @app_commands.command(name="clear", description="حذف عدد معين من الرسائل")
+    # --- أمر الحذف المحدث للكميات الضخمة ---
+    @app_commands.command(name="clear", description="حذف عدد ضخم من الرسائل")
     @admin_only()
     async def clear(self, interaction: discord.Interaction, amount: int):
         await interaction.response.defer(ephemeral=True)
-        deleted = await interaction.channel.purge(limit=amount)
-        await interaction.followup.send(f"تم حذف {len(deleted)} رسالة.", ephemeral=True)
+        try:
+            deleted = await interaction.channel.purge(limit=amount)
+            await interaction.followup.send(f"🗑️ تم حذف {len(deleted)} رسالة بنجاح.", ephemeral=True)
+        except Exception as e:
+            await interaction.followup.send(f"❌ حدث خطأ، تأكد أن الرسائل الحديثة قابلة للحذف.", ephemeral=True)
 
     # --- أوامر المعلومات ---
     @app_commands.command(name="يوزر", description="معلومات عضو")
