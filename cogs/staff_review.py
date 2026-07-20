@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 PUBLIC_REVIEW_CHANNEL_ID = 1528075992546148544  # روم التقييم العام
@@ -34,16 +35,28 @@ class ReviewLaunchView(discord.ui.View):
         await interaction.response.send_modal(ReviewModal())
 
 class StaffReview(commands.Cog):
-    def __init__(self, bot): self.bot = bot
+    def __init__(self, bot): 
+        self.bot = bot
+
+    async def cog_load(self):
+        self.bot.add_view(ReviewLaunchView())
+
+    # أمر السلاش لإرسال اللوحة يدوياً
+    @app_commands.command(name="setup_review", description="إرسال لوحة تقييم الإدارة في القناة الحالية")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def setup_review(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="⭐ تقييم الطاقم الإداري", 
+            description="مرحباً بك في قسم تقييم الإدارة لـ **VOID**.\n\nيسعدنا سماع آرائكم بكل شفافية وبسرية تامة.\n\n**اضغط على الزر بالأسفل للبدء 👇**", 
+            color=0x8000FF
+        )
+        embed.set_image(url=SERVER_LOGO_URL)
+        await interaction.response.send_message("✅ تم إرسال لوحة التقييم بنجاح.", ephemeral=True)
+        await interaction.channel.send(embed=embed, view=ReviewLaunchView())
+
+    # هذه الوظيفة تبقى لإرسال اللوحة تلقائياً عند التشغيل (إذا كنت تفضل ذلك)
     @commands.Cog.listener()
     async def on_ready(self):
         self.bot.add_view(ReviewLaunchView())
-        channel = self.bot.get_channel(PUBLIC_REVIEW_CHANNEL_ID)
-        if channel:
-            async for message in channel.history(limit=5):
-                if message.author == self.bot.user: return 
-            embed = discord.Embed(title="⭐ تقييم الطاقم الإداري", description="مرحباً بك في قسم تقييم الإدارة لـ **VOID**.\n\nيسعدنا سماع آرائكم بكل شفافية وبسرية تامة.\n\n**اضغط على الزر بالأسفل للبدء 👇**", color=0x8000FF)
-            embed.set_image(url=SERVER_LOGO_URL)
-            await channel.send(embed=embed, view=ReviewLaunchView())
 
 async def setup(bot): await bot.add_cog(StaffReview(bot))
