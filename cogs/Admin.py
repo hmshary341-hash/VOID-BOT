@@ -81,28 +81,12 @@ class Admin(commands.Cog):
         await interaction.response.send_message("👁️ تم إظهار القناة.", ephemeral=True)
 
     # --- أوامر الصيانة ---
-    @app_commands.command(name="sync", description="تحديث أوامر السلاش (للمطورين فقط)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def sync(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        synced = await self.bot.tree.sync()
-        await interaction.followup.send(f"✅ تم تحديث {len(synced)} أمر في السيرفر!")
-
     @app_commands.command(name="clear", description="حذف عدد معين من الرسائل")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def clear(self, interaction: discord.Interaction, amount: int):
         await interaction.response.defer(ephemeral=True)
         deleted = await interaction.channel.purge(limit=amount)
         await interaction.followup.send(f"تم حذف {len(deleted)} رسالة.", ephemeral=True)
-
-    @app_commands.command(name="reload", description="إعادة تحميل ملف برمجياً")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def reload(self, interaction: discord.Interaction, cog: str):
-        try:
-            await self.bot.reload_extension(f"cogs.{cog}")
-            await interaction.response.send_message(f"✅ تم إعادة تحميل `cogs.{cog}` بنجاح.", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ فشل: {e}", ephemeral=True)
 
     # --- أوامر المعلومات ---
     @app_commands.command(name="يوزر", description="معلومات عضو")
