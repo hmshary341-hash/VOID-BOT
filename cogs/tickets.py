@@ -14,7 +14,7 @@ IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/15281909
 
 # --- الأزرار الخاصة داخل التذكرة ---
 class TicketActions(discord.ui.View):
-    def __init__(self, opener=None): # تم إضافة =None ليعمل الكود في main.py
+    def __init__(self, opener=None):
         super().__init__(timeout=None)
         self.opener = opener
         self.claimed_by = None
@@ -43,7 +43,6 @@ class TicketActions(discord.ui.View):
         # 1. إرسال اللوج عبر كوج اللوجز
         logs_cog = interaction.client.get_cog("Logs")
         if logs_cog:
-            # إذا لم يتم تعيين opener (بسبب إعادة تشغيل البوت)، نستخدم صاحب التكت من القناة إذا أمكن
             opener_user = self.opener if self.opener else interaction.user 
             await logs_cog.send_ticket_log(
                 ticket_name=interaction.channel.name,
@@ -66,7 +65,7 @@ class TicketActions(discord.ui.View):
             
         await interaction.channel.delete()
 
-# --- المودال ---
+# --- المودال (للإبلاغات) ---
 class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
     target = discord.ui.TextInput(label='يوزر الشخص المبلغ عنه', style=discord.TextStyle.short, required=True)
     reason = discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph, required=True)
@@ -77,10 +76,13 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         self.report_type = report_type
 
     async def on_submit(self, interaction: discord.Interaction):
+        # استخدام defer مع ephemeral لمنع انتهاء وقت التفاعل (Interaction failed)
         await interaction.response.defer(ephemeral=True)
+        
         ticket_num = random.randint(1000, 9999) 
         category = interaction.guild.get_channel(CATEGORY_ID)
         channel = await interaction.guild.create_text_channel(name=f"ticket-{ticket_num}", category=category)
+        
         await channel.set_permissions(interaction.guild.default_role, read_messages=False)
         await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
         
@@ -107,7 +109,22 @@ class TicketSelect(discord.ui.Select):
         if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
             await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
         else:
-            await interaction.response.send_message("تم اختيار الاستفسار، سيتم فتح التذكرة قريباً...", ephemeral=True)
+            # تم إصلاح الاستفسار هنا ليقوم بإنشاء القناة مباشرة مثل البقية بدون تعليق
+            await interaction.response.defer(ephemeral=True)
+            
+            ticket_num = random.randint(1000, 9999)
+            category = interaction.guild.get_channel(CATEGORY_ID)
+            channel = await interaction.guild.create_text_channel(name=f"inquiry-{ticket_num}", category=category)
+            
+            await channel.set_permissions(interaction.guild.default_role, read_messages=False)
+            await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
+            
+            embed = discord.Embed(title=f"تذكرة استفسار | #{ticket_num}", description="يرجى كتابة استفسارك هنا وسيقوم الإدارة بالرد عليك قريباً.", color=discord.Color.blue())
+            embed.add_field(name="👤 صاحب الاستفسار", value=interaction.user.mention, inline=False)
+            embed.set_image(url=IMAGE_URL)
+            
+            await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions(opener=interaction.user))
+            await interaction.followup.send(f"✅ تم فتح تذكرة الاستفسار بنجاح: {channel.mention}", ephemeral=True)
 
 class OpenTicketView(discord.ui.View):
     def __init__(self):
