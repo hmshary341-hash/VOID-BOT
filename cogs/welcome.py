@@ -1,4 +1,5 @@
 import io
+import aiohttp
 import discord
 from discord.ext import commands
 from PIL import Image, ImageDraw, ImageFont, ImageOps
@@ -6,8 +7,8 @@ import arabic_reshaper
 from bidi.algorithm import get_display
 
 # الإعدادات
-WELCOME_CHANNEL_ID = 1527750890952462408  # آي دي قناة الترحيب
-LEAVE_CHANNEL_ID = 1527750890952462408    # آي دي قناة المغادرة (يمكنك جعلها نفس القناة أو قناة أخرى)
+WELCOME_CHANNEL_ID = 1525595451607486535  # آي دي قناة الترحيب
+LEAVE_CHANNEL_ID = 1527103575946297415    # آي دي قناة المغادرة
 BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
 
 class WelcomeLeave(commands.Cog):
@@ -19,14 +20,15 @@ class WelcomeLeave(commands.Cog):
         card = Image.new("RGBA", (800, 400), (20, 20, 25, 255))
         draw = ImageDraw.Draw(card)
 
-        # محاولة جلب الصورة الخلفية
+        # محاولة جلب الصورة الخلفية باستخدام aiohttp
         try:
-            async with member.client.http._session.get(BACKGROUND_IMAGE_URL) as resp:
-                if resp.status == 200:
-                    bg_bytes = await resp.read()
-                    bg = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
-                    bg = bg.resize((800, 400))
-                    card.paste(bg, (0, 0))
+            async with aiohttp.ClientSession() as session:
+                async with session.get(BACKGROUND_IMAGE_URL) as resp:
+                    if resp.status == 200:
+                        bg_bytes = await resp.read()
+                        bg = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
+                        bg = bg.resize((800, 400))
+                        card.paste(bg, (0, 0))
         except Exception:
             pass
 
