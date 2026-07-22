@@ -104,7 +104,7 @@ class Admin(commands.Cog):
         except Exception:
             await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
 
-    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت (مصحح) ---
+    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت (مصحح تماماً) ---
     @app_commands.command(name="modhistory", description="فحص سجلات العضو لمعرفة من أعطاه تحذير أو تايم أوت أو عقوبة")
     @admin_only()
     async def modhistory(self, interaction: discord.Interaction, member: discord.Member):
@@ -128,20 +128,18 @@ class Admin(commands.Cog):
                         embed.add_field(name="🔨 حظر (Ban)", value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}", inline=False)
                         actions_found += 1
                     elif entry.action == discord.AuditLogAction.member_update:
-                        for change in entry.changes:
-                            if change.key == 'communication_disabled_until' and change.after:
-                                embed.add_field(name="🔇 تايم أوت (Timeout)", value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}", inline=False)
-                                actions_found += 1
+                        if entry.after and getattr(entry.after, 'communication_disabled_until', None):
+                            embed.add_field(name="🔇 تايم أوت (Timeout)", value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}", inline=False)
+                            actions_found += 1
                     elif entry.action == discord.AuditLogAction.member_role_update:
-                        for change in entry.changes:
-                            if change.key == 'roles' and change.after:
-                                role_ids = [r.id for r in change.after]
-                                for r_id in [WARN_ROLE_1_ID, WARN_ROLE_2_ID, WARN_ROLE_3_ID, PRISON_ROLE_ID]:
-                                    if r_id in role_ids:
-                                        r_name = "تحذير 1" if r_id == WARN_ROLE_1_ID else ("تحذير 2" if r_id == WARN_ROLE_2_ID else ("تحذير 3" if r_id == WARN_ROLE_3_ID else "سجن"))
-                                        embed.add_field(name=f"⚠️ رتبة إدارية ({r_name})", value=f"المسؤول: {entry.user.mention}", inline=False)
-                                        actions_found += 1
-                                        break
+                        if entry.after and getattr(entry.after, 'roles', None):
+                            role_ids = [r.id for r in entry.after.roles]
+                            for r_id in [WARN_ROLE_1_ID, WARN_ROLE_2_ID, WARN_ROLE_3_ID, PRISON_ROLE_ID]:
+                                if r_id in role_ids:
+                                    r_name = "تحذير 1" if r_id == WARN_ROLE_1_ID else ("تحذير 2" if r_id == WARN_ROLE_2_ID else ("تحذير 3" if r_id == WARN_ROLE_3_ID else "سجن"))
+                                    embed.add_field(name=f"⚠️ رتبة إدارية ({r_name})", value=f"المسؤول: {entry.user.mention}", inline=False)
+                                    actions_found += 1
+                                    break
                                         
             if actions_found == 0:
                 embed.description = "لا توجد سجلات عقوبات أو تحذيرات أو تايم أوت حديثة مسجلة لهذا العضو في سجل السيرفر."
@@ -149,7 +147,6 @@ class Admin(commands.Cog):
             await interaction.followup.send(embed=embed, ephemeral=True)
             
         except Exception as e:
-            # تم إضافة إظهار الخطأ الحقيقي للمساعدة في حال حدوث أي طارئ آخر
             await interaction.followup.send(f"❌ حدث خطأ تقني:\n`{e}`", ephemeral=True)
 
     @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
