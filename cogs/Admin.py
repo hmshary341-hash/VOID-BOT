@@ -66,6 +66,44 @@ class Admin(commands.Cog):
         except Exception:
             await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
 
+    # --- أمر إزالة/تخفيض التحذير ---
+    @app_commands.command(name="unwarn", description="إزالة تحذير من العضو (تخفيض مستوى التحذير)")
+    @admin_only()
+    async def unwarn(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
+        await interaction.response.defer(ephemeral=True)
+        
+        r1 = interaction.guild.get_role(WARN_ROLE_1_ID)
+        r2 = interaction.guild.get_role(WARN_ROLE_2_ID)
+        r3 = interaction.guild.get_role(WARN_ROLE_3_ID)
+
+        if not r1 or not r2 or not r3:
+            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة آي دي رتب التحذيرات في السيرفر.", ephemeral=True)
+
+        try:
+            if r3 in member.roles:
+                await member.remove_roles(r3)
+                await member.add_roles(r2)
+                warning_level = "تحذير 2"
+            elif r2 in member.roles:
+                await member.remove_roles(r2)
+                await member.add_roles(r1)
+                warning_level = "تحذير 1"
+            elif r1 in member.roles:
+                await member.remove_roles(r1)
+                warning_level = "بدون تحذيرات (تمت إزالة جميع التحذيرات)"
+            else:
+                return await interaction.followup.send(f"❌ العضو {member.mention} ليس لديه أي تحذيرات لإزالتها.", ephemeral=True)
+
+            await interaction.followup.send(f"✅ تم تحديث حالة العضو {member.mention} وأصبح الآن: **{warning_level}**. السبب: {reason}", ephemeral=True)
+            
+            try:
+                await member.send(f"✅ تم تخفيض أو إزالة تحذير منك في سيرفر **{interaction.guild.name}**.\nالحالة الجديدة: **{warning_level}**\nالسبب: {reason}")
+            except:
+                pass
+
+        except Exception:
+            await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
+
     @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
     @admin_only()
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
