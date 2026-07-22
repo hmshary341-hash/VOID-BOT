@@ -41,16 +41,6 @@ class Admin(commands.Cog):
             except Exception:
                 pass
 
-    # --- أوامر الأعضاء العامة (تم إبقاء أوامر الألوان) ---
-    @app_commands.command(name="color", description="اختر لونك المفضّل")
-    async def color(self, interaction: discord.Interaction, اختيار_اللون: str):
-        await interaction.response.send_message(f"🎨 تم طلب لون: {اختيار_اللون}.", ephemeral=True)
-
-    @app_commands.command(name="colors", description="عرض الألوان المتاحة في السيرفر")
-    async def colors(self, interaction: discord.Interaction):
-        embed = discord.Embed(title="🎨 الألوان المتاحة", description="قائمة الألوان المتوفرة للأعضاء.", color=discord.Color.blurple())
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
     # --- أوامر الإدارة والمشرفين ---
     @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
     @admin_only()
