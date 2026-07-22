@@ -41,7 +41,7 @@ class Admin(commands.Cog):
             except Exception:
                 pass
 
-    # --- أوامر الأعضاء العامة ---
+    # --- أوامر الأعضاء العامة (تم إبقاء أوامر الألوان) ---
     @app_commands.command(name="color", description="اختر لونك المفضّل")
     async def color(self, interaction: discord.Interaction, اختيار_اللون: str):
         await interaction.response.send_message(f"🎨 تم طلب لون: {اختيار_اللون}.", ephemeral=True)
