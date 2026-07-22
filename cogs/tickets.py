@@ -1,6 +1,6 @@
-import datetime
 import io
 import random
+from datetime import datetime
 import chat_exporter
 import discord
 from discord import app_commands
@@ -33,8 +33,10 @@ class TicketActions(discord.ui.View):
 
     @discord.ui.button(label="قفل", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="lock_ticket")
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.channel.set_permissions(interaction.user, send_messages=False)
-        await interaction.response.send_message("🔒 تم قفل التذكرة.", ephemeral=True)
+        # تم التصحيح لتقفل على صاحب التذكرة (opener) بدلاً من الشخص الضاغط
+        target = self.opener if self.opener else interaction.user
+        await interaction.channel.set_permissions(target, send_messages=False)
+        await interaction.response.send_message("🔒 تم قفل التذكرة لصاحبها.", ephemeral=True)
 
     @discord.ui.button(label="حذف", style=discord.ButtonStyle.danger, emoji="🗑️", custom_id="delete_ticket")
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
