@@ -1,10 +1,10 @@
+import datetime
+import io
+import random
+import chat_exporter
 import discord
 from discord import app_commands
 from discord.ext import commands
-import io
-import chat_exporter
-import random
-from datetime import datetime
 
 # الإعدادات
 CATEGORY_ID = 1525952823156801576
@@ -76,7 +76,6 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         self.report_type = report_type
 
     async def on_submit(self, interaction: discord.Interaction):
-        # استخدام defer مع ephemeral لمنع انتهاء وقت التفاعل (Interaction failed)
         await interaction.response.defer(ephemeral=True)
         
         ticket_num = random.randint(1000, 9999) 
@@ -109,7 +108,6 @@ class TicketSelect(discord.ui.Select):
         if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
             await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
         else:
-            # تم إصلاح الاستفسار هنا ليقوم بإنشاء القناة مباشرة مثل البقية بدون تعليق
             await interaction.response.defer(ephemeral=True)
             
             ticket_num = random.randint(1000, 9999)
@@ -135,7 +133,7 @@ class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ارسل_تكت", description="إرسال رسالة نظام التذاكر")
+    @app_commands.command(name="ticket", description="إرسال رسالة نظام التذاكر")
     @app_commands.checks.has_permissions(administrator=True)
     async def send_ticket(self, interaction: discord.Interaction):
         embed = discord.Embed(title="VOID | مركز الدعم", description="اختر نوع الطلب أدناه:", color=discord.Color.blue())
