@@ -1,105 +1,83 @@
+import datetime
 import discord
 from discord.ext import commands
-from discord.ui import View, Button
-from datetime import datetime
+
+# آي دي قناة السجلات لديك
+LOG_CHANNEL_ID = 1527750890952462408
 
 class Logs(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.log_channel_id = 1526625037808046241 
 
-    # --- تسجيل الأوامر التقليدية (Prefix Commands) ---
-    @commands.Cog.listener()
-    async def on_command(self, ctx):
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        embed = discord.Embed(title="⌨️ أمر مستخدم", color=discord.Color.blue())
-        embed.add_field(name="الأمر", value=f"`{ctx.command.name}`", inline=True)
-        embed.add_field(name="المستخدم", value=ctx.author.mention, inline=True)
-        embed.add_field(name="القناة", value=ctx.channel.mention, inline=True)
-        await channel.send(embed=embed)
+    # دالة مخصصة تستقبلها أوامر الإدارة فقط (مثل تايم، باند، كك)
+    async def send_admin_log(self, guild, title, member, moderator, details):
+        if LOG_CHANNEL_ID == 0:
+            return
+        log_channel = guild.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            try:
+                embed = discord.Embed(
+                    title=f"🛡️ سجل الإدارة | {title}", 
+                    color=discord.Color.red(), 
+                    timestamp=datetime.datetime.now(datetime.timezone.utc)
+                )
+                embed.add_field(name="👤 المستهدف", value=f"{member.mention}", inline=True)
+                embed.add_field(name="👮 المسؤول", value=f"{moderator.mention}", inline=True)
+                embed.add_field(name="📝 التفاصيل", value=details, inline=False)
+                await log_channel.send(embed=embed)
+            except Exception:
+                pass
 
-    # --- تسجيل أوامر السلاش (Slash Commands) ---
-    @commands.Cog.listener()
-    async def on_interaction(self, interaction):
-        # نتحقق فقط إذا كان التفاعل عبارة عن أمر سلاش (Slash Command)
-        if interaction.type == discord.InteractionType.application_command:
-            channel = self.bot.get_channel(self.log_channel_id)
-            if not channel: return
-            
-            embed = discord.Embed(title="🤖 أمر سلاش مستخدم", color=discord.Color.blurple())
-            embed.add_field(name="الأمر", value=f"`/{interaction.command.name}`", inline=True)
-            embed.add_field(name="المستخدم", value=interaction.user.mention, inline=True)
-            embed.add_field(name="القناة", value=interaction.channel.mention, inline=True)
-            await channel.send(embed=embed)
-
-    # --- اللوجات السابقة (الرسائل، الرتب، القنوات) ---
+    # تسجيل حذف الرسائل في الشات
     @commands.Cog.listener()
     async def on_message_delete(self, message):
-        if message.author.bot or not message.guild: return
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        embed = discord.Embed(title="🗑️ حذف رسالة", color=discord.Color.red())
-        embed.add_field(name="المرسل", value=message.author.mention)
-        embed.add_field(name="القناة", value=message.channel.mention)
-        embed.add_field(name="المحتوى", value=message.content or "*(صورة أو رسالة فارغة)*")
-        await channel.send(embed=embed)
+        if message.author.bot or not message.guild:
+            return
+        
+        log_channel = message.guild.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            embed = discord.Embed(
+                title="🗑️ حذف رسالة",
+                color=discord.Color.orange(),
+                timestamp=datetime.datetime.now(datetime.timezone.utc)
+            )
+            embed.add_field(name="👤 العضو", value=message.author.mention, inline=True)
+            embed.add_field(name="📌 القناة", value=message.channel.mention, inline=True)
+            
+            content = message.content if message.content else "محتوى فارغ (صورة أو مرفق)"
+            if len(content) > 1024:
+                content = content[:1021] + "..."
+            
+            embed.add_field(name="📝 المحتوى المحذوف", value=content, inline=False)
+            await log_channel.send(embed=embed)
 
+    # تسجيل تعديل الرسائل في الشات
     @commands.Cog.listener()
     async def on_message_edit(self, before, after):
-        if before.author.bot or not before.guild or before.content == after.content: return
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        embed = discord.Embed(title="✏️ تعديل رسالة", color=discord.Color.gold())
-        embed.add_field(name="المرسل", value=before.author.mention)
-        embed.add_field(name="قبل التعديل", value=before.content or "...", inline=False)
-        embed.add_field(name="بعد التعديل", value=after.content or "...", inline=False)
-        await channel.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_guild_channel_delete(self, channel):
-        log_channel = self.bot.get_channel(self.log_channel_id)
-        if not log_channel: return
-        embed = discord.Embed(title="🚨 حذف قناة", color=discord.Color.dark_red(), description=f"تم حذف القناة: **{channel.name}**")
-        await log_channel.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_member_join(self, member):
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        embed = discord.Embed(title="📥 عضو جديد", color=discord.Color.green(), description=f"{member.mention} انضم للسيرفر!")
-        await channel.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_member_remove(self, member):
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        embed = discord.Embed(title="📤 مغادرة عضو", color=discord.Color.orange(), description=f"{member.name} غادر السيرفر.")
-        await channel.send(embed=embed)
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        if before.roles == after.roles: return
-        channel = self.bot.get_channel(self.log_channel_id)
-        if not channel: return
-        added = [r.name for r in after.roles if r not in before.roles]
-        removed = [r.name for r in before.roles if r not in after.roles]
-        if added:
-            await channel.send(f"➕ **إضافة رتبة:** {after.mention} حصل على: {', '.join(added)}")
-        if removed:
-            await channel.send(f"➖ **إزالة رتبة:** {after.mention} تمت إزالة: {', '.join(removed)}")
-
-    async def send_ticket_log(self, ticket_name, opener, claimer, closer, open_time, close_time, reason, transcript_url):
-        log_channel = self.bot.get_channel(self.log_channel_id)
-        if not log_channel: return
-        embed = discord.Embed(title="🎟️ تم إغلاق التذكرة", color=discord.Color.dark_theme())
-        embed.add_field(name="اسم التذكرة", value=ticket_name, inline=False)
-        embed.add_field(name="تم الفتح بواسطة", value=opener.mention if opener else "غير معروف", inline=False)
-        embed.add_field(name="تم الإغلاق بواسطة", value=closer.mention, inline=False)
-        embed.add_field(name="وقت الإغلاق", value=f"<t:{int(close_time.timestamp())}:F>", inline=False)
-        view = View()
-        view.add_item(Button(label="عرض التذكرة", url=transcript_url, style=discord.ButtonStyle.link))
-        await log_channel.send(embed=embed, view=view)
+        if before.author.bot or not before.guild:
+            return
+        if before.content == after.content:
+            return  # تجاهل لو تم تعديل الإمبد فقط بدون تغيير النص
+        
+        log_channel = before.guild.get_channel(LOG_CHANNEL_ID)
+        if log_channel:
+            embed = discord.Embed(
+                title="✏️ تعديل رسالة",
+                color=discord.Color.gold(),
+                timestamp=datetime.datetime.now(datetime.timezone.utc)
+            )
+            embed.add_field(name="👤 العضو", value=before.author.mention, inline=True)
+            embed.add_field(name="📌 القناة", value=before.channel.mention, inline=True)
+            
+            old_content = before.content if before.content else "فارغ"
+            new_content = after.content if after.content else "فارغ"
+            
+            if len(old_content) > 1024: old_content = old_content[:1021] + "..."
+            if len(new_content) > 1024: new_content = new_content[:1021] + "..."
+            
+            embed.add_field(name="❌ قبل التعديل", value=old_content, inline=False)
+            embed.add_field(name="✅ بعد التعديل", value=new_content, inline=False)
+            await log_channel.send(embed=embed)
 
 async def setup(bot):
     await bot.add_cog(Logs(bot))
