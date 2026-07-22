@@ -2,8 +2,8 @@ import datetime
 import discord
 from discord.ext import commands
 
-# آي دي قناة السجلات لديك
-LOG_CHANNEL_ID = 1527750890952462408
+# آي دي قناة السجلات المحدث
+LOG_CHANNEL_ID = 1526625037808046241
 
 class Logs(commands.Cog):
     def __init__(self, bot):
