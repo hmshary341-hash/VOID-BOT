@@ -42,9 +42,14 @@ class Admin(commands.Cog):
                 pass
 
     # --- أوامر الأعضاء العامة ---
-    @app_commands.command(name="سؤال", description="اطرح سؤالاً أو استفساراً")
-    async def question(self, interaction: discord.Interaction, نص_السؤال: str):
-        await interaction.response.send_message("✅ تم إرسال سؤالك بنجاح، سيتم الرد عليك قريباً.", ephemeral=True)
+    @app_commands.command(name="اختار_لون", description="اختر لونك الخاص برقم")
+    async def color(self, interaction: discord.Interaction, اختيار_اللون: str):
+        await interaction.response.send_message(f"🎨 تم طلب لون: {اختيار_اللون} (قم بربط الكود برتب الألوان هنا حسب رغبتك).", ephemeral=True)
+
+    @app_commands.command(name="إظهار_الألوان", description="عرض لوحة الألوان")
+    async def show_colors(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="🎨 الألوان المتاحة", description="قائمة الألوان المتوفرة للأعضاء.", color=discord.Color.blurple())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # --- أوامر الإدارة والمشرفين ---
     @app_commands.command(name="تايم", description="إسكات عضو (تايم أوت)")
@@ -80,7 +85,7 @@ class Admin(commands.Cog):
         except Exception:
             await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الحظر.", ephemeral=True)
 
-    @app_commands.command(name="فكها", description="إلغاء عقوبة (اكتب تايم أو باند)")
+    @app_commands.command(name="إلغاء", description="إلغاء عقوبة (اكتب تايم أو باند)")
     @admin_only()
     async def unban_or_timeout(self, interaction: discord.Interaction, نوع: str, id_او_منشن: str):
         await interaction.response.defer(ephemeral=True)
@@ -123,6 +128,22 @@ class Admin(commands.Cog):
             await interaction.followup.send(f"🗑️ تم حذف {len(deleted)} رسالة بنجاح.", ephemeral=True)
         except Exception:
             await interaction.followup.send(f"❌ حدث خطأ، تأكد أن الرسائل قابلة للحذف وليست قديمة جداً.", ephemeral=True)
+
+    @app_commands.command(name="تكت", description="إرسال رسالة نظام التذاكر")
+    @admin_only()
+    async def ticket(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(title="🎟️ نظام التكتات", description="اضغط على الزر أدناه لفتح تكت جديد.", color=discord.Color.green())
+        await interaction.channel.send(embed=embed)
+        await interaction.followup.send("✅ تم إنشاء لوحة التكتات في القناة.", ephemeral=True)
+
+    @app_commands.command(name="تقييم", description="إرسال لوحة تقييم الإدارة في القناة الحالية")
+    @admin_only()
+    async def setup_review(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        embed = discord.Embed(title="⭐ تقييم الإدارة", description="اضغط على الزر أدناه لتقييم الإدارة والخدمة.", color=discord.Color.gold())
+        await interaction.channel.send(embed=embed)
+        await interaction.followup.send("✅ تم إرسال لوحة التقييم في القناة.", ephemeral=True)
 
     @app_commands.command(name="سجن", description="سجن عضو")
     @admin_only()
