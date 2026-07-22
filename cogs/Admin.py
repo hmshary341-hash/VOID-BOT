@@ -8,7 +8,7 @@ PRISON_ROLE_ID = 1526011928433135810  # آي دي رتبة السجن
 LOG_CHANNEL_ID = 1526625037808046241  # آي دي قناة السجلات
 ADMIN_ROLE_ID = 1527513659704606740   # رتبة الإدارة المحددة
 
-# --- دالة التحقق من الصلاحية (الأدمن أو رتبة الإدارة المحددة) ---
+# --- دالة التحقق من الصلاحية ---
 def admin_only():
     async def predicate(interaction: discord.Interaction):
         if interaction.user.guild_permissions.administrator:
@@ -42,17 +42,17 @@ class Admin(commands.Cog):
                 pass
 
     # --- أوامر الأعضاء العامة ---
-    @app_commands.command(name="اختار_لون", description="اختر لونك المفضّل")
+    @app_commands.command(name="color", description="اختر لونك المفضّل")
     async def color(self, interaction: discord.Interaction, اختيار_اللون: str):
         await interaction.response.send_message(f"🎨 تم طلب لون: {اختيار_اللون}.", ephemeral=True)
 
-    @app_commands.command(name="إظهار_الألوان", description="عرض الألوان المتاحة في السيرفر")
-    async def show_colors(self, interaction: discord.Interaction):
+    @app_commands.command(name="colors", description="عرض الألوان المتاحة في السيرفر")
+    async def colors(self, interaction: discord.Interaction):
         embed = discord.Embed(title="🎨 الألوان المتاحة", description="قائمة الألوان المتوفرة للأعضاء.", color=discord.Color.blurple())
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
     # --- أوامر الإدارة والمشرفين ---
-    @app_commands.command(name="تايم", description="إسكات عضو (تايم أوت)")
+    @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
     @admin_only()
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -61,9 +61,9 @@ class Admin(commands.Cog):
             await interaction.followup.send(f"🔇 تم إسكات {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "تايم أوت", member, interaction.user, f"المدة: {minutes} دقيقة | السبب: {reason}")
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ: تأكد أن رتبة البوت أعلى من العضو المراد إسكاته.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ: تأكد أن رتبة البوت أعلى من العضو المراد إسكاته.", ephemeral=True)
 
-    @app_commands.command(name="كك", description="طرد عضو")
+    @app_commands.command(name="kick", description="طرد عضو من السيرفر")
     @admin_only()
     async def kick(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -72,9 +72,9 @@ class Admin(commands.Cog):
             await interaction.followup.send(f"🦵 تم طرد {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "طرد", member, interaction.user, f"السبب: {reason}")
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الطرد.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ أثناء محاولة الطرد.", ephemeral=True)
 
-    @app_commands.command(name="باند", description="حظر عضو نهائياً")
+    @app_commands.command(name="ban", description="حظر عضو نهائياً من السيرفر")
     @admin_only()
     async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -83,43 +83,45 @@ class Admin(commands.Cog):
             await interaction.followup.send(f"🔨 تم حظر {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "حظر", member, interaction.user, f"السبب: {reason}")
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الحظر.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ أثناء محاولة الحظر.", ephemeral=True)
 
-    @app_commands.command(name="إلغاء", description="إلغاء عقوبة (اكتب تايم أو باند)")
+    @app_commands.command(name="unban", description="فك الحظر عن مستخدم بواسطة الآي دي")
     @admin_only()
-    async def unban_or_timeout(self, interaction: discord.Interaction, نوع: str, id_او_منشن: str):
+    async def unban(self, interaction: discord.Interaction, user_id: str):
         await interaction.response.defer(ephemeral=True)
         try:
-            target_id = int(id_او_منشن.strip('<@!>'))
-            if نوع == "تايم":
-                member = interaction.guild.get_member(target_id)
-                if member:
-                    await member.timeout(None)
-                    await interaction.followup.send("✅ تم فك السكات عن العضو.", ephemeral=True)
-                else:
-                    await interaction.followup.send("❌ العضو غير موجود في السيرفر حالياً.", ephemeral=True)
-            else:
-                user = await self.bot.fetch_user(target_id)
-                await interaction.guild.unban(user)
-                await interaction.followup.send("✅ تم فك الحظر عن المستخدم.", ephemeral=True)
+            target_id = int(user_id.strip('<@!>'))
+            user = await self.bot.fetch_user(target_id)
+            await interaction.guild.unban(user)
+            await interaction.followup.send("✅ تم فك الحظر عن المستخدم بنجاح.", ephemeral=True)
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ، تأكد من صحة الآي دي أو البيانات المدخلة.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ، تأكد من صحة الآي دي المدخل.", ephemeral=True)
 
-    @app_commands.command(name="إخفاء", description="إخفاء القناة الحالية عن الأعضاء")
+    @app_commands.command(name="untimeout", description="فك السكات عن عضو")
+    @admin_only()
+    async def untimeout(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await member.timeout(None)
+            await interaction.followup.send(f"✅ تم فك السكات عن {member.mention}.", ephemeral=True)
+        except Exception:
+            await interaction.followup.send("❌ حدث خطأ أثناء محاولة فك السكات.", ephemeral=True)
+
+    @app_commands.command(name="hide", description="إخفاء القناة الحالية عن الأعضاء")
     @admin_only()
     async def hide(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
         await interaction.followup.send("🙈 تم إخفاء القناة.", ephemeral=True)
 
-    @app_commands.command(name="إظهار", description="إظهار القناة للأعضاء")
+    @app_commands.command(name="show", description="إظهار القناة الحالية للأعضاء")
     @admin_only()
     async def show(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.followup.send("👁️ تم إظهار القناة.", ephemeral=True)
 
-    @app_commands.command(name="حذف", description="حذف عدد من الرسائل")
+    @app_commands.command(name="clear", description="حذف عدد من الرسائل في القناة")
     @admin_only()
     async def clear(self, interaction: discord.Interaction, amount: int):
         await interaction.response.defer(ephemeral=True)
@@ -127,9 +129,9 @@ class Admin(commands.Cog):
             deleted = await interaction.channel.purge(limit=amount)
             await interaction.followup.send(f"🗑️ تم حذف {len(deleted)} رسالة بنجاح.", ephemeral=True)
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ، تأكد أن الرسائل قابلة للحذف وليست قديمة جداً.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ، تأكد أن الرسائل قابلة للحذف وليست قديمة جداً.", ephemeral=True)
 
-    @app_commands.command(name="سجن", description="سجن عضو")
+    @app_commands.command(name="prison", description="سجن عضو")
     @admin_only()
     async def prison(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.defer(ephemeral=True)
@@ -138,12 +140,12 @@ class Admin(commands.Cog):
             return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من آي دي الرتبة في الكود.", ephemeral=True)
         try:
             await member.add_roles(role)
-            await interaction.followup.send("⛓️ تم سجن العضو بنجاح.", ephemeral=True)
+            await interaction.followup.send(f"⛓️ تم سجن {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "سجن", member, interaction.user, "تم تقييده برتبة السجين.")
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتبة السجن والرتبة المستهدفة.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتبة السجن والرتبة المستهدفة.", ephemeral=True)
 
-    @app_commands.command(name="افراج", description="إفراج عن عضو")
+    @app_commands.command(name="unprison", description="الإفراج عن عضو من السجن")
     @admin_only()
     async def unprison(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.defer(ephemeral=True)
@@ -152,10 +154,10 @@ class Admin(commands.Cog):
             return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من آي دي الرتبة في الكود.", ephemeral=True)
         try:
             await member.remove_roles(role)
-            await interaction.followup.send("🔓 تم الإفراج عن العضو بنجاح.", ephemeral=True)
+            await interaction.followup.send(f"🔓 تم الإفراج عن {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "إفراج", member, interaction.user, "تمت إزالة رتبة السجين.")
         except Exception:
-            await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الإفراج عن العضو.", ephemeral=True)
+            await interaction.followup.send("❌ حدث خطأ أثناء محاولة الإفراج عن العضو.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Admin(bot))
