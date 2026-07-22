@@ -5,8 +5,12 @@ from discord.ext import commands
 
 # --- الإعدادات ---
 PRISON_ROLE_ID = 1526011928433135810  # آي دي رتبة السجن
-LOG_CHANNEL_ID = 1526625037808046241  # آي دي قناة السجلات
 ADMIN_ROLE_ID = 1527513659704606740   # رتبة الإدارة المحددة
+
+# --- آي دي رتب التحذيرات ---
+WARN_ROLE_1_ID = 1529362841696735353
+WARN_ROLE_2_ID = 1529362930997661807
+WARN_ROLE_3_ID = 1529363013382176830
 
 # --- دالة التحقق من الصلاحية ---
 def admin_only():
@@ -23,25 +27,45 @@ class Admin(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def send_log(self, guild, title, member, moderator, details):
-        if LOG_CHANNEL_ID == 0:
-            return
-        log_channel = guild.get_channel(LOG_CHANNEL_ID)
-        if log_channel:
+    # --- أمر التحذير التصاعدي ---
+    @app_commands.command(name="warn", description="تحذير عضو وإعطائه رتبة تحذير تصاعدية")
+    @admin_only()
+    async def warn(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
+        await interaction.response.defer(ephemeral=True)
+        
+        r1 = interaction.guild.get_role(WARN_ROLE_1_ID)
+        r2 = interaction.guild.get_role(WARN_ROLE_2_ID)
+        r3 = interaction.guild.get_role(WARN_ROLE_3_ID)
+
+        if not r1 or not r2 or not r3:
+            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة آي دي رتب التحذيرات في السيرفر.", ephemeral=True)
+
+        try:
+            if r3 in member.roles:
+                await interaction.followup.send(f"⚠️ العضو {member.mention} لديه بالفعل **تحذير 3** (الحد الأقصى).", ephemeral=True)
+                return
+            elif r2 in member.roles:
+                await member.remove_roles(r2)
+                await member.add_roles(r3)
+                warning_level = "تحذير 3"
+            elif r1 in member.roles:
+                await member.remove_roles(r1)
+                await member.add_roles(r2)
+                warning_level = "تحذير 2"
+            else:
+                await member.add_roles(r1)
+                warning_level = "تحذير 1"
+
+            await interaction.followup.send(f"⚠️ تم إعطاء {member.mention} **{warning_level}** بنجاح. السبب: {reason}", ephemeral=True)
+            
             try:
-                embed = discord.Embed(
-                    title=f"🛡️ سجل الإدارة | {title}", 
-                    color=discord.Color.red(), 
-                    timestamp=datetime.datetime.now(datetime.timezone.utc)
-                )
-                embed.add_field(name="👤 المستهدف", value=f"{member.mention}", inline=True)
-                embed.add_field(name="👮 المسؤول", value=f"{moderator.mention}", inline=True)
-                embed.add_field(name="📝 التفاصيل", value=details, inline=False)
-                await log_channel.send(embed=embed)
-            except Exception:
+                await member.send(f"⚠️ لقد تلقيت **{warning_level}** في سيرفر **{interaction.guild.name}**.\nالسبب: {reason}")
+            except:
                 pass
 
-    # --- أوامر الإدارة والمشرفين ---
+        except Exception:
+            await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
+
     @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
     @admin_only()
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
@@ -49,7 +73,6 @@ class Admin(commands.Cog):
         try:
             await member.timeout(datetime.timedelta(minutes=minutes), reason=reason)
             await interaction.followup.send(f"🔇 تم إسكات {member.mention} بنجاح.", ephemeral=True)
-            await self.send_log(interaction.guild, "تايم أوت", member, interaction.user, f"المدة: {minutes} دقيقة | السبب: {reason}")
         except Exception:
             await interaction.followup.send("❌ حدث خطأ: تأكد أن رتبة البوت أعلى من العضو المراد إسكاته.", ephemeral=True)
 
@@ -60,7 +83,6 @@ class Admin(commands.Cog):
         try:
             await member.kick(reason=reason)
             await interaction.followup.send(f"🦵 تم طرد {member.mention} بنجاح.", ephemeral=True)
-            await self.send_log(interaction.guild, "طرد", member, interaction.user, f"السبب: {reason}")
         except Exception:
             await interaction.followup.send("❌ حدث خطأ أثناء محاولة الطرد.", ephemeral=True)
 
@@ -71,7 +93,6 @@ class Admin(commands.Cog):
         try:
             await member.ban(reason=reason)
             await interaction.followup.send(f"🔨 تم حظر {member.mention} بنجاح.", ephemeral=True)
-            await self.send_log(interaction.guild, "حظر", member, interaction.user, f"السبب: {reason}")
         except Exception:
             await interaction.followup.send("❌ حدث خطأ أثناء محاولة الحظر.", ephemeral=True)
 
@@ -131,7 +152,6 @@ class Admin(commands.Cog):
         try:
             await member.add_roles(role)
             await interaction.followup.send(f"⛓️ تم سجن {member.mention} بنجاح.", ephemeral=True)
-            await self.send_log(interaction.guild, "سجن", member, interaction.user, "تم تقييده برتبة السجين.")
         except Exception:
             await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتبة السجن والرتبة المستهدفة.", ephemeral=True)
 
@@ -145,7 +165,6 @@ class Admin(commands.Cog):
         try:
             await member.remove_roles(role)
             await interaction.followup.send(f"🔓 تم الإفراج عن {member.mention} بنجاح.", ephemeral=True)
-            await self.send_log(interaction.guild, "إفراج", member, interaction.user, "تمت إزالة رتبة السجين.")
         except Exception:
             await interaction.followup.send("❌ حدث خطأ أثناء محاولة الإفراج عن العضو.", ephemeral=True)
 
