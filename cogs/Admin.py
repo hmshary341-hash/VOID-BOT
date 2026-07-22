@@ -51,11 +51,6 @@ class Admin(commands.Cog):
         embed = discord.Embed(title="🎨 الألوان المتاحة", description="قائمة الألوان المتوفرة للأعضاء.", color=discord.Color.blurple())
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="سؤال", description="اطرح سؤالاً أو استفساراً")
-    async def question(self, interaction: discord.Interaction, نص_السؤال: str):
-        await interaction.response.send_message("✅ تم إرسال سؤالك بنجاح، سيتم الرد عليك قريباً.", ephemeral=True)
-        # يمكنك توجيه السؤال لقناة مخصصة إذا أردت
-
     # --- أوامر الإدارة والمشرفين ---
     @app_commands.command(name="تايم", description="إسكات عضو (تايم أوت)")
     @admin_only()
@@ -137,9 +132,10 @@ class Admin(commands.Cog):
     @app_commands.command(name="تكت", description="فتح نظام التكتات")
     @admin_only()
     async def ticket(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(title="🎟️ نظام التكتات", description="اضغط على الزر أدناه لفتح تكت جديد.", color=discord.Color.green())
         await interaction.channel.send(embed=embed)
-        await interaction.response.send_message("✅ تم إنشاء لوحة التكتات في القناة.", ephemeral=True)
+        await interaction.followup.send("✅ تم إنشاء لوحة التكتات في القناة.", ephemeral=True)
 
     @app_commands.command(name="تقييم", description="إرسال تقييم للإدارة أو الخدمة")
     @admin_only()
