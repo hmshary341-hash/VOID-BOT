@@ -104,7 +104,7 @@ class Admin(commands.Cog):
         except Exception:
             await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
 
-    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت ---
+    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت (مصحح) ---
     @app_commands.command(name="modhistory", description="فحص سجلات العضو لمعرفة من أعطاه تحذير أو تايم أوت أو عقوبة")
     @admin_only()
     async def modhistory(self, interaction: discord.Interaction, member: discord.Member):
@@ -129,12 +129,12 @@ class Admin(commands.Cog):
                         actions_found += 1
                     elif entry.action == discord.AuditLogAction.member_update:
                         for change in entry.changes:
-                            if change.name == 'communication_disabled_until' and change.after:
+                            if change.key == 'communication_disabled_until' and change.after:
                                 embed.add_field(name="🔇 تايم أوت (Timeout)", value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}", inline=False)
                                 actions_found += 1
                     elif entry.action == discord.AuditLogAction.member_role_update:
                         for change in entry.changes:
-                            if change.name == 'roles' and change.after:
+                            if change.key == 'roles' and change.after:
                                 role_ids = [r.id for r in change.after]
                                 for r_id in [WARN_ROLE_1_ID, WARN_ROLE_2_ID, WARN_ROLE_3_ID, PRISON_ROLE_ID]:
                                     if r_id in role_ids:
@@ -148,8 +148,9 @@ class Admin(commands.Cog):
             
             await interaction.followup.send(embed=embed, ephemeral=True)
             
-        except Exception:
-            await interaction.followup.send("❌ حدث خطأ، تأكد أن البوت يمتلك صلاحية قراءة سجلات السيرفر (View Audit Log).", ephemeral=True)
+        except Exception as e:
+            # تم إضافة إظهار الخطأ الحقيقي للمساعدة في حال حدوث أي طارئ آخر
+            await interaction.followup.send(f"❌ حدث خطأ تقني:\n`{e}`", ephemeral=True)
 
     @app_commands.command(name="timeout", description="إسكات عضو (تايم أوت)")
     @admin_only()
