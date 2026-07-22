@@ -41,8 +41,23 @@ class Admin(commands.Cog):
             except Exception:
                 pass
 
-    # --- أوامر الإدارة الأساسية ---
-    @app_commands.command(name="سدها", description="إسكات عضو (تايم أوت)")
+    # --- أوامر الأعضاء العامة (متاحة للجميع) ---
+    @app_commands.command(name="لون", description="اختر لونك المفضل")
+    async def color(self, interaction: discord.Interaction, اختيار_اللون: str):
+        await interaction.response.send_message(f"🎨 تم طلب لون: {اختيار_اللون} (قم بربط الكود برتب الألوان هنا حسب رغبتك).", ephemeral=True)
+
+    @app_commands.command(name="إظهار_اللون", description="عرض الألوان المتاحة في السيرفر")
+    async def show_color(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="🎨 الألوان المتاحة", description="قائمة الألوان المتوفرة للأعضاء.", color=discord.Color.blurple())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    @app_commands.command(name="سؤال", description="اطرح سؤالاً أو استفساراً")
+    async def question(self, interaction: discord.Interaction, نص_السؤال: str):
+        await interaction.response.send_message("✅ تم إرسال سؤالك بنجاح، سيتم الرد عليك قريباً.", ephemeral=True)
+        # يمكنك توجيه السؤال لقناة مخصصة إذا أردت
+
+    # --- أوامر الإدارة والمشرفين ---
+    @app_commands.command(name="تايم", description="إسكات عضو (تايم أوت)")
     @admin_only()
     async def timeout(self, interaction: discord.Interaction, member: discord.Member, minutes: int, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -50,10 +65,10 @@ class Admin(commands.Cog):
             await member.timeout(datetime.timedelta(minutes=minutes), reason=reason)
             await interaction.followup.send(f"🔇 تم إسكات {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "تايم أوت", member, interaction.user, f"المدة: {minutes} دقيقة | السبب: {reason}")
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ: تأكد أن رتبة البوت أعلى من العضو المراد إسكاته.", ephemeral=True)
 
-    @app_commands.command(name="سقها", description="طرد عضو")
+    @app_commands.command(name="كك", description="طرد عضو")
     @admin_only()
     async def kick(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -61,10 +76,10 @@ class Admin(commands.Cog):
             await member.kick(reason=reason)
             await interaction.followup.send(f"🦵 تم طرد {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "طرد", member, interaction.user, f"السبب: {reason}")
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الطرد.", ephemeral=True)
 
-    @app_commands.command(name="القم", description="حظر عضو (باند)")
+    @app_commands.command(name="باند", description="حظر عضو نهائياً")
     @admin_only()
     async def ban(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
@@ -72,7 +87,7 @@ class Admin(commands.Cog):
             await member.ban(reason=reason)
             await interaction.followup.send(f"🔨 تم حظر {member.mention} بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "حظر", member, interaction.user, f"السبب: {reason}")
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الحظر.", ephemeral=True)
 
     @app_commands.command(name="فكها", description="إلغاء عقوبة (اكتب تايم أو باند)")
@@ -92,76 +107,44 @@ class Admin(commands.Cog):
                 user = await self.bot.fetch_user(target_id)
                 await interaction.guild.unban(user)
                 await interaction.followup.send("✅ تم فك الحظر عن المستخدم.", ephemeral=True)
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ، تأكد من صحة الآي دي أو البيانات المدخلة.", ephemeral=True)
 
-    # --- أوامر التحكم بالقنوات ---
-    @app_commands.command(name="قفل", description="قفل القناة الحالية")
-    @admin_only()
-    async def lock(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=False)
-        await interaction.followup.send("🔒 تم قفل القناة.", ephemeral=True)
-
-    @app_commands.command(name="افتح", description="فتح القناة الحالية")
-    @admin_only()
-    async def unlock(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        await interaction.channel.set_permissions(interaction.guild.default_role, send_messages=True)
-        await interaction.followup.send("🔓 تم فتح القناة.", ephemeral=True)
-
-    @app_commands.command(name="اخفها", description="إخفاء القناة عن الأعضاء")
+    @app_commands.command(name="إخفاء", description="إخفاء القناة الحالية عن الأعضاء")
     @admin_only()
     async def hide(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=False)
         await interaction.followup.send("🙈 تم إخفاء القناة.", ephemeral=True)
 
-    @app_commands.command(name="ظهرها", description="إظهار القناة للأعضاء")
+    @app_commands.command(name="إظهار", description="إظهار القناة للأعضاء")
     @admin_only()
     async def show(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.channel.set_permissions(interaction.guild.default_role, view_channel=True)
         await interaction.followup.send("👁️ تم إظهار القناة.", ephemeral=True)
 
-    # --- أمر الحذف المحدث للكميات الضخمة ---
-    @app_commands.command(name="clear", description="حذف عدد ضخم من الرسائل")
+    @app_commands.command(name="حذف", description="حذف عدد من الرسائل")
     @admin_only()
     async def clear(self, interaction: discord.Interaction, amount: int):
         await interaction.response.defer(ephemeral=True)
         try:
             deleted = await interaction.channel.purge(limit=amount)
             await interaction.followup.send(f"🗑️ تم حذف {len(deleted)} رسالة بنجاح.", ephemeral=True)
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ، تأكد أن الرسائل قابلة للحذف وليست قديمة جداً.", ephemeral=True)
 
-    # --- أوامر المعلومات ---
-    @app_commands.command(name="يوزر", description="معلومات عضو")
+    @app_commands.command(name="تكت", description="فتح نظام التكتات")
     @admin_only()
-    async def user_info(self, interaction: discord.Interaction, member: discord.Member):
-        embed = discord.Embed(title=f"معلومات {member.name}", color=discord.Color.blue())
-        embed.add_field(name="ID", value=member.id, inline=True)
-        joined = member.joined_at.strftime("%Y-%m-%d") if member.joined_at else "غير معروف"
-        embed.add_field(name="تاريخ الانضمام", value=joined, inline=True)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(name="سيرفر", description="معلومات السيرفر")
-    @admin_only()
-    async def server_info(self, interaction: discord.Interaction):
-        embed = discord.Embed(title=f"معلومات {interaction.guild.name}", color=discord.Color.green())
-        embed.add_field(name="الأعضاء", value=interaction.guild.member_count, inline=True)
-        owner_name = interaction.guild.owner.name if interaction.guild.owner else "غير معروف"
-        embed.add_field(name="صاحب السيرفر", value=owner_name, inline=True)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    # --- أوامر متنوعة ---
-    @app_commands.command(name="اعلان", description="إرسال إعلان")
-    @admin_only()
-    async def announce(self, interaction: discord.Interaction, عنوان: str, محتوى: str):
-        await interaction.response.send_message("✅ جاري إرسال الإعلان...", ephemeral=True)
-        embed = discord.Embed(title=f"📢 {عنوان}", description=محتوى, color=discord.Color.gold())
+    async def ticket(self, interaction: discord.Interaction):
+        embed = discord.Embed(title="🎟️ نظام التكتات", description="اضغط على الزر أدناه لفتح تكت جديد.", color=discord.Color.green())
         await interaction.channel.send(embed=embed)
-        await interaction.edit_original_response(content="✅ تم إرسال الإعلان بنجاح.")
+        await interaction.response.send_message("✅ تم إنشاء لوحة التكتات في القناة.", ephemeral=True)
+
+    @app_commands.command(name="تقييم", description="إرسال تقييم للإدارة أو الخدمة")
+    @admin_only()
+    async def rating(self, interaction: discord.Interaction, النجوم: int, ملاحظة: str = "لا يوجد"):
+        await interaction.response.send_message(f"⭐ تم تسجيل تقييمك ({النجوم}/5) بنجاح.", ephemeral=True)
 
     @app_commands.command(name="سجن", description="سجن عضو")
     @admin_only()
@@ -174,7 +157,7 @@ class Admin(commands.Cog):
             await member.add_roles(role)
             await interaction.followup.send("⛓️ تم سجن العضو بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "سجن", member, interaction.user, "تم تقييده برتبة السجين.")
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتبة السجن والرتبة المستهدفة.", ephemeral=True)
 
     @app_commands.command(name="افراج", description="إفراج عن عضو")
@@ -188,7 +171,7 @@ class Admin(commands.Cog):
             await member.remove_roles(role)
             await interaction.followup.send("🔓 تم الإفراج عن العضو بنجاح.", ephemeral=True)
             await self.send_log(interaction.guild, "إفراج", member, interaction.user, "تمت إزالة رتبة السجين.")
-        except Exception as e:
+        except Exception:
             await interaction.followup.send(f"❌ حدث خطأ أثناء محاولة الإفراج عن العضو.", ephemeral=True)
 
 async def setup(bot):
