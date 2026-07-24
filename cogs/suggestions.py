@@ -30,7 +30,7 @@ class SuggestionView(discord.ui.View):
 class Suggestions(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.suggestion_channel_id = 1527099799038595192 # روم الاقتراحات العام
+        self.suggestion_channel_id = 1530048438190870528 # روم الاقتراحات الجديد
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -47,3 +47,4 @@ class Suggestions(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Suggestions(bot))
+    bot.add_view(SuggestionView())
