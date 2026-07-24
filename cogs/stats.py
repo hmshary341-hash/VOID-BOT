@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # --- الإعدادات الأساسية ---
 LEVEL_UP_CHANNEL_ID = 1530087509407563797  # آي دي روم إرسال رسائل التلفل
-OWNER_ID = 1529995977203777566  # آي دي الحساب المخصص لتصفير المستويات
+ALLOWED_ROLE_ID = 1529995977203777566  # آي دي الرتبة المسموح لها باستخدام أمر التصفير
 
 # --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
 LEVEL_ROLES = {
@@ -234,12 +234,13 @@ class Leveling(commands.Cog):
       )
 
   @app_commands.command(
-      name="reset_levels", description="تصفير مستويات ونقاط الجميع (مخصص لك فقط)"
+      name="reset_levels",
+      description="تصفير مستويات ونقاط الجميع (مخصص لصاحب الرتبة المحددة)",
   )
   async def reset_levels(self, interaction: discord.Interaction):
-    if interaction.user.id != OWNER_ID:
+    if not any(r.id == ALLOWED_ROLE_ID for r in interaction.user.roles):
       await interaction.response.send_message(
-          "❌ | عذراً، هذا الأمر مخصص لصاحب السيرفر فقط!", ephemeral=True
+          "❌ | عذراً، هذا الأمر مخصص لأصحاب هذه الرتبة فقط!", ephemeral=True
       )
       return
 
