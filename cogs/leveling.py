@@ -30,8 +30,8 @@ LEVEL_ROLES = {
     100: "Eternal",
 }
 
-# --- رابط بطاقة الرانك الجديدة ---
-CARD_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530331458055700500/1784929816717.png?ex=6a652fbb&is=6a63de3b&hm=9aeb5f7845e52ac5d08dab6a36a16475d37737976215c00a21fa19a59ad0f33b&"
+# --- رابط بطاقة الرانك الدائم ---
+CARD_BG_URL = "https://i.imgur.com/OWCueg0.png"
 
 
 async def generate_card(member, xp, level, role_name="Member"):
@@ -64,7 +64,7 @@ async def generate_card(member, xp, level, role_name="Member"):
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
 
-    # إحداثيات مركز الدائرة في البطاقة الجديدة
+    # إحداثيات مركز الدائرة في البطاقة
     avatar_coords = (115, 135)
     bg.paste(avatar, avatar_coords, mask)
 
