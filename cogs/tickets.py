@@ -10,9 +10,11 @@ from discord.ext import commands
 CATEGORY_ID = 1530047675028865175         # آي دي فئة التذاكر
 TICKET_CHANNEL_ID = 1530048038666506290   # آي دي روم التكت الأساسي
 LOG_CHANNEL_ID = 1527750890952462408      # آي دي روم اللوجز
-IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
 
-# --- أسماء الرتب الإدارية والدعم الفني ---
+# 📌 استبدل الرابط أدناه برابط الصورة الجديدة الخاصة بك لتغطي المربع بالكامل
+IMAGE_URL = "ضع_رابط_الصورة_هنا"
+
+# --- أسماء الرتب الإدارية والدعم الفني (بدون رتب الإيفنت) ---
 SUPPORT_ROLE_NAMES = [
     "Owner",
     "Co-Owner",
@@ -51,7 +53,6 @@ class TicketActions(discord.ui.View):
     async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.defer()
         
-        # 1. إرسال اللوج عبر كوج اللوجز
         logs_cog = interaction.client.get_cog("Logs")
         if logs_cog:
             opener_user = self.opener if self.opener else interaction.user 
@@ -66,7 +67,6 @@ class TicketActions(discord.ui.View):
                 transcript_url="https://transcript-service.com/"
             )
 
-        # 2. التوثيق (Chat Exporter)
         transcript = await chat_exporter.export(interaction.channel)
         transcript_file = discord.File(io.BytesIO(transcript.encode()), filename=f"transcript-{interaction.channel.name}.html")
         
@@ -106,7 +106,8 @@ class ReportModal(discord.ui.Modal, title='نموذج الشكوى'):
         embed.add_field(name="المبلغ عنه", value=self.target.value, inline=False)
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
-        embed.set_image(url=IMAGE_URL)
+        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+            embed.set_image(url=IMAGE_URL)
         
         support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
         mention_text = support_role.mention if support_role else "@here"
@@ -139,7 +140,8 @@ class VerificationModal(discord.ui.Modal, title='نموذج توثيق البن�
         embed.add_field(name="🖼️ الدليل المقدم", value=self.proof.value, inline=False)
         if self.notes.value:
             embed.add_field(name="📝 ملاحظات", value=self.notes.value, inline=False)
-        embed.set_image(url=IMAGE_URL)
+        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+            embed.set_image(url=IMAGE_URL)
         
         support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
         mention_text = support_role.mention if support_role else "@here"
@@ -147,7 +149,7 @@ class VerificationModal(discord.ui.Modal, title='نموذج توثيق البن�
         await channel.send(mention_text, embed=embed, view=TicketActions(opener=interaction.user))
         await interaction.followup.send(f"✅ تم فتح تذكرة التوثيق بنجاح: {channel.mention}", ephemeral=True)
 
-# --- قائمة الاختيار المطابقة للصورة ---
+# --- قائمة الاختيار للأقسام الأربعة ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
         super().__init__(placeholder='اختر نوع التذكرة المناسبة من الخيارات أدناه...', options=[
@@ -181,7 +183,8 @@ class TicketSelect(discord.ui.Select):
             
             embed = discord.Embed(title=f"تذكرة إستفسار | #{ticket_num}", description="يرجى كتابة استفسارك هنا وسيقوم الدعم الفني بالرد عليك قريباً.", color=discord.Color.blue())
             embed.add_field(name="👤 صاحب الاستفسار", value=interaction.user.mention, inline=False)
-            embed.set_image(url=IMAGE_URL)
+            if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+                embed.set_image(url=IMAGE_URL)
             
             support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
             mention_text = support_role.mention if support_role else "@here"
@@ -209,7 +212,9 @@ class Tickets(commands.Cog):
             description="اختر نوع التذكرة المناسبة من الخيارات أدناه.\n\n> ⚠️ **ملاحظات مهمة:**\n> • يرجى اختيار القسم المناسب لمشكلتك.\n> • التذاكر غير المناسبة يتم إغلاقها دون مراجعة.\n> • سيتم الرد عليك في أقرب وقت ممكن.", 
             color=discord.Color.dark_gold()
         )
-        embed.set_image(url=IMAGE_URL)
+        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+            embed.set_image(url=IMAGE_URL)
+            
         await interaction.response.send_message(embed=embed, view=OpenTicketView())
         await interaction.followup.send("✅ تم إرسال لوحة التذاكر بنجاح.", ephemeral=True)
 
