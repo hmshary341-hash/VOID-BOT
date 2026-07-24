@@ -22,6 +22,9 @@ CACHE_DIR = Path("/app/data/image_cache")
 CACHE_MAX_AGE_DAYS = 7  # إعادة تحميل الصور كل 7 أيام
 REQUEST_COOLDOWN = 1.0  # تأخير بين الطلبات (بالثواني) لتجنب 429
 
+# --- رسالة التشجيع عند الترقية ---
+LEVEL_UP_ENCOURAGEMENT = "كفو على التفاعل كمل تفاعلك يا فله"
+
 # --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
 LEVEL_ROLES = {
     5: "Bronze",
@@ -282,11 +285,11 @@ class Leveling(commands.Cog):
             )
             if card_file:
               await target_channel.send(
-                  content=f"{message.author.mention}", file=card_file
+                  content=f"{message.author.mention}\n{LEVEL_UP_ENCOURAGEMENT}", file=card_file
               )
             else:
               await target_channel.send(
-                  f"🎉 مبروك {message.author.mention}! لقد صعدت للمستوى **{level}**!"
+                  f"🎉 مبروك {message.author.mention}! لقد صعدت للمستوى **{level}**!\n{LEVEL_UP_ENCOURAGEMENT}"
               )
           except Exception as e:
             print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
