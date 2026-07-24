@@ -9,7 +9,7 @@ from discord.ext import commands
 # --- الإعدادات الأساسية ---
 CATEGORY_ID = 1530047675028865175         # آي دي فئة التذاكر
 TICKET_CHANNEL_ID = 1530048038666506290   # آي دي روم التكت الأساسي
-LOG_CHANNEL_ID = 1527750890952462408      # آي دي روم اللوجز
+LOG_CHANNEL_ID = 1530295161828016279      # آي دي روم اللوجز الجديد
 
 # 📌 رابط الصورة الخاص بك
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530292406782787787/file_00000000cac881f49d4ac09da2958858.png?ex=6a650b5d&is=6a63b9dd&hm=1fffbebe862f59047c970c674f003a190b657a29618b8027f5bff0ebe3ea7baa&"
@@ -23,6 +23,34 @@ SUPPORT_ROLE_NAMES = [
     "Senior Support",
     "Support Staff"
 ]
+
+# --- نظام اللوجز (Logs Cog) ---
+class Logs(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    async def send_ticket_log(self, ticket_name, opener, claimer, closer, open_time, close_time, reason, transcript_url="غير متوفر"):
+        log_channel = self.bot.get_channel(LOG_CHANNEL_ID)
+        if not log_channel:
+            return
+
+        embed = discord.Embed(
+            title="📁 سجل تذكرة مغلقة",
+            color=discord.Color.red(),
+            timestamp=datetime.now()
+        )
+        embed.add_field(name="اسم التذكرة", value=ticket_name, inline=True)
+        embed.add_field(name="صاحب التذكرة", value=opener.mention if opener else "غير معروف", inline=True)
+        embed.add_field(name="المستلم", value=claimer.mention if claimer else "لم يتم الاستلام", inline=True)
+        embed.add_field(name="أغلق بواسطة", value=closer.mention if closer else "غير معروف", inline=True)
+        embed.add_field(name="السبب", value=reason, inline=False)
+        
+        if open_time:
+            embed.add_field(name="وقت الفتح", value=f"<t:{int(open_time.timestamp())}:F>", inline=True)
+        if close_time:
+            embed.add_field(name="وقت الإغلاق", value=f"<t:{int(close_time.timestamp())}:F>", inline=True)
+            
+        await log_channel.send(embed=embed)
 
 # --- الأزرار الخاصة داخل التذكرة ---
 class TicketActions(discord.ui.View):
@@ -72,8 +100,7 @@ class TicketActions(discord.ui.View):
                     closer=interaction.user,
                     open_time=interaction.channel.created_at,
                     close_time=datetime.now(),
-                    reason="تم حذف التذكرة",
-                    transcript_url="https://transcript-service.com/"
+                    reason="تم حذف التذكرة"
                 )
         except Exception:
             pass
@@ -143,11 +170,9 @@ class TicketSelect(discord.ui.Select):
         ], custom_id="ticket_select_persistent")
 
     async def callback(self, interaction: discord.Interaction):
-        # الشكاوى تفتح نموذج (Modal)
         if self.values[0] in ['شكوى على إداري', 'شكوى على عضو']:
             await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
         else:
-            # الاستفسار وتوثيق البنات يفتحان روم تذكرة مباشرة بدون أي نماذج أسئلة
             await interaction.response.defer(ephemeral=True)
             
             ticket_type = self.values[0]
@@ -206,3 +231,6 @@ class Tickets(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(Tickets(bot))
+    await bot.add_cog(Logs(bot))
+    bot.add_view(OpenTicketView())
+    bot.add_view(TicketActions())
