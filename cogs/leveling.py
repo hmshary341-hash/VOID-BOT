@@ -52,6 +52,15 @@ FALLBACK_BG_COLOR = (30, 30, 50)  # لون أزرق داكن
 CARD_WIDTH = 800
 CARD_HEIGHT = 450
 
+# --- إعدادات شريط التقدم ---
+PROGRESS_BAR_WIDTH = 350
+PROGRESS_BAR_HEIGHT = 20
+PROGRESS_BAR_X = 440
+PROGRESS_BAR_Y = 310
+PROGRESS_BAR_COLOR = (0, 229, 255)  # سماوي
+PROGRESS_BAR_BG_COLOR = (60, 60, 100)  # رمادي مزرق
+PROGRESS_BAR_BORDER_COLOR = (100, 150, 255)  # أزرق فاتح
+
 
 def create_fallback_background(width: int = CARD_WIDTH, height: int = CARD_HEIGHT) -> bytes:
   """إنشاء خلفية بديلة بسيطة باستخدام لون صلب"""
@@ -154,6 +163,65 @@ class ImageCache:
 image_cache = ImageCache(CACHE_DIR)
 
 
+def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: int):
+  """رسم شريط التقدم على البطاقة
+  
+  Args:
+    draw: كائن ImageDraw لرسم العناصر
+    current_xp: نقاط الخبرة الحالية
+    required_xp: نقاط الخبرة المطلوبة للمستوى التالي
+  """
+  try:
+    # التأكد من أن القيم صحيحة
+    current_xp = max(0, min(current_xp, required_xp))
+    
+    # حساب نسبة التقدم
+    progress_ratio = current_xp / required_xp if required_xp > 0 else 0
+    filled_width = int(PROGRESS_BAR_WIDTH * progress_ratio)
+    
+    # رسم الخلفية (الجزء الفارغ)
+    draw.rectangle(
+      [(PROGRESS_BAR_X, PROGRESS_BAR_Y), 
+       (PROGRESS_BAR_X + PROGRESS_BAR_WIDTH, PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT)],
+      fill=PROGRESS_BAR_BG_COLOR,
+      outline=PROGRESS_BAR_BORDER_COLOR,
+      width=2
+    )
+    
+    # رسم الجزء الممتلئ
+    if filled_width > 0:
+      draw.rectangle(
+        [(PROGRESS_BAR_X, PROGRESS_BAR_Y), 
+         (PROGRESS_BAR_X + filled_width, PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT)],
+        fill=PROGRESS_BAR_COLOR
+      )
+    
+    # رسم نسبة مئوية في وسط الشريط
+    try:
+      font_percent = ImageFont.truetype("arial.ttf", 14)
+    except:
+      font_percent = ImageFont.load_default()
+    
+    percentage = int(progress_ratio * 100)
+    percent_text = f"{percentage}%"
+    
+    # حساب موضع النص في منتصف الشريط
+    bbox = draw.textbbox((0, 0), percent_text, font=font_percent)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
+    
+    text_x = PROGRESS_BAR_X + (PROGRESS_BAR_WIDTH - text_width) // 2
+    text_y = PROGRESS_BAR_Y + (PROGRESS_BAR_HEIGHT - text_height) // 2
+    
+    # رسم النص بلون متناسب
+    text_color = (255, 255, 255)  # أبيض للتباين
+    draw.text((text_x, text_y), percent_text, fill=text_color, font=font_percent)
+    
+  except Exception as e:
+    print(f"❌ خطأ في رسم شريط التقدم: {e}")
+    traceback.print_exc()
+
+
 async def generate_card(member, xp, level, role_name="Member"):
   """وظيفة تصميم البطاقة ووضع صورة العضو داخل الإطار الدائري بدقة"""
   try:
@@ -188,7 +256,7 @@ async def generate_card(member, xp, level, role_name="Member"):
     avatar_coords = (115, 135)
     bg.paste(avatar, avatar_coords, mask)
 
-    # رسم النصوص
+    # رسم النصوص والعناصر
     draw = ImageDraw.Draw(bg)
 
     try:
@@ -207,7 +275,10 @@ async def generate_card(member, xp, level, role_name="Member"):
     xp_text = f"{xp} / {next_level_xp} XP"
     draw.text((610, 245), xp_text, fill=(255, 179, 71), font=font_text)
 
-    # 3. كتابة اسم الرتبة
+    # 3. رسم شريط التقدم
+    draw_progress_bar(draw, xp, next_level_xp)
+
+    # 4. كتابة اسم الرتبة
     draw.text((580, 370), f"CYBERNETIC", fill=(216, 180, 255), font=font_text)
 
     # حفظ الصورة في ذاكرة مؤقتة للإرسال
