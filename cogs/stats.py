@@ -1,108 +1,192 @@
+from io import BytesIO
+import aiohttp
 import discord
 from discord import app_commands
 from discord.ext import commands
-import json
-import os
+import random
+import sqlite3
+from PIL import Image, ImageDraw, ImageFont
 
-# --- الإعدادات ---
-# تأكد من وضع رقم الروم الصحيح هنا
-STATS_CHANNEL = 1526712984531894292
-DATA_FILE = "xp_data.json"
+# --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
+LEVEL_ROLES = {
+    5: "Bronze",
+    10: "Silver",
+    15: "Gold",
+    20: "Platinum",
+    25: "Emerald",
+    30: "Sapphire",
+    35: "Ruby",
+    40: "Diamond",
+    45: "Crystal",
+    50: "Master",
+    55: "Elite",
+    60: "Champion",
+    70: "Legend",
+    85: "Mythic",
+    100: "Eternal",
+}
 
-# --- نظام أزرار التنقل (للتنقل بين الصفحات) ---
-class TopView(discord.ui.View):
-    def __init__(self, sorted_data, interaction):
-        super().__init__(timeout=60)
-        self.data = sorted_data
-        self.interaction = interaction
-        self.page = 0
-        self.per_page = 10 
+# --- رابط خلفية بطاقة الرانك ---
+RANK_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530310291772936486/file_000000000fcc82469984187e529362ed.png?ex=6a651c05&is=6a63ca85&hm=51ebd4f8b36da10396d71d9db06a61ce5836d6ca7fb1587b41597118795d5387&"
 
-    def get_embed(self):
-        start = self.page * self.per_page
-        end = start + self.per_page
-        page_data = self.data[start:end]
+async def generate_rank_card(member, xp, level):
+    """وظيفة رسم وتصميم بطاقة الرانك تلقائياً"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            # تحميل الخلفية
+            async with session.get(RANK_BG_URL) as resp:
+                if resp.status != 200: return None
+                bg_data = await resp.read()
 
-        # شكل الإمبد "نوفا" النظيف
-        embed = discord.Embed(
-            title="💬 أفضل نقاط الكتابة", 
-            color=0x2F3136
-        )
+            # تحميل أفتار العضو
+            avatar_url = member.display_avatar.with_format("png").url
+            async with session.get(avatar_url) as resp:
+                if resp.status != 200: return None
+                avatar_data = await resp.read()
+
+        # فتح الصور باستخدام Pillow
+        bg = Image.open(BytesIO(bg_data)).convert("RGBA")
+        avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
+
+        # تعديل حجم الأفتار وجعله دائرياً
+        avatar_size = 150
+        avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
         
-        description = ""
-        for i, (user_id, info) in enumerate(page_data, start=start + 1):
-            member = self.interaction.guild.get_member(int(user_id))
-            display_name = member.display_name if member else info['name']
-            
-            # حساب مستوى تقريبي
-            xp = info['xp']
-            level = xp // 100 
-            
-            # ترتيب الأيقونات (💎 للأول، 🔸 للبقية)
-            rank_icon = "💎" if i == 1 else "🔸"
-            
-            # التنسيق النظيف (بدون backticks)
-            description += f"{rank_icon} #{i} | **{display_name}** — خبرة: {xp} | مستوى: {level}\n\n"
+        mask = Image.new("L", (avatar_size, avatar_size), 0)
+        draw_mask = ImageDraw.Draw(mask)
+        draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
+
+        # لصق الأفتار في مكان مناسب على اليسار
+        bg.paste(avatar, (50, 50), mask)
+
+        # رسم النصوص (اسم العضو، المستوى، والـ XP)
+        draw = ImageDraw.Draw(bg)
         
-        embed.description = description if description else "لا توجد بيانات حالياً."
-        embed.set_footer(text=f"صفحة {self.page + 1} من { (len(self.data) // self.per_page) + 1 }")
-        return embed
+        # محاولة استخدام الخط الافتراضي أو خط النظام
+        try:
+            font_large = ImageFont.truetype("arial.ttf", 36)
+            font_small = ImageFont.truetype("arial.ttf", 24)
+        except:
+            font_large = ImageFont.load_default()
+            font_small = ImageFont.load_default()
 
-    @discord.ui.button(label="السابق", style=discord.ButtonStyle.secondary, emoji="⬅️")
-    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if self.page > 0:
-            self.page -= 1
-            await interaction.response.edit_message(embed=self.get_embed(), view=self)
+        next_level_xp = (level + 1) * 100
 
-    @discord.ui.button(label="التالي", style=discord.ButtonStyle.secondary, emoji="➡️")
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if (self.page + 1) * self.per_page < len(self.data):
-            self.page += 1
-            await interaction.response.edit_message(embed=self.get_embed(), view=self)
+        # كتابة اسم العضو والمستوى والنقاط
+        draw.text((230, 60), f"{member.display_name}", fill=(255, 255, 255), font=font_large)
+        draw.text((230, 110), f"Level: {level}", fill=(170, 130, 255), font=font_small)
+        draw.text((230, 150), f"XP: {xp} / {next_level_xp}", fill=(200, 200, 200), font=font_small)
 
-# --- الكلاس الأساسي ---
-class Stats(commands.Cog):
+        # حفظ الصورة في ذاكرة مؤقتة للإرسال
+        output = BytesIO()
+        bg.save(output, format="PNG")
+        output.seek(0)
+        return discord.File(output, filename="rank.png")
+    except Exception as e:
+        print(f"❌ خطأ في إنشاء بطاقة الرانك: {e}")
+        return None
+
+class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.db_setup()
 
-    # --- تحميل وحفظ البيانات ---
-    def load_data(self):
-        if not os.path.exists(DATA_FILE): return {}
-        with open(DATA_FILE, "r") as f:
-            try: return json.load(f)
-            except: return {}
+    def db_setup(self):
+        self.conn = sqlite3.connect("levels.db")
+        self.cursor = self.conn.cursor()
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER,
+                guild_id INTEGER,
+                xp INTEGER,
+                level INTEGER,
+                PRIMARY KEY (user_id, guild_id)
+            )
+        ''')
+        self.conn.commit()
 
-    def save_data(self, data):
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-
-    # --- احتساب النقاط عند الكتابة ---
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author.bot or not message.guild: return
-        
-        data = self.load_data()
-        user_id = str(message.author.id)
-        
-        if user_id not in data:
-            data[user_id] = {"name": message.author.name, "xp": 0}
-        
-        data[user_id]["xp"] += 1
-        self.save_data(data)
+        if message.author.bot or not message.guild:
+            return
 
-    # --- أمر التوب الفخم ---
-    @app_commands.command(name="top", description="عرض قائمة المتصدرين الكاملة")
-    async def top(self, interaction: discord.Interaction):
-        data = self.load_data()
-        if not data:
-            return await interaction.response.send_message("❌ لا توجد بيانات للنقاط حالياً.", ephemeral=True)
+        user_id = message.author.id
+        guild_id = message.guild.id
+
+        earned_xp = random.randint(15, 25)
+
+        self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ? AND guild_id = ?", (user_id, guild_id))
+        result = self.cursor.fetchone()
+
+        if result is None:
+            xp, level = earned_xp, 0
+            self.cursor.execute("INSERT INTO users VALUES (?, ?, ?, ?)", (user_id, guild_id, xp, level))
+        else:
+            xp, level = result
+            xp += earned_xp
+
+            next_level_xp = (level + 1) * 100
+
+            if xp >= next_level_xp:
+                level += 1
+                xp -= next_level_xp
+
+                try:
+                    await message.channel.send(
+                        f"{message.author.mention}\n"
+                        f"⚡ | لفل جديد! {level}\n"
+                        f"يا فله، التفاعل حقك رهيب! 🔥\n"
+                        f"شد حيلك وكمل، القمة تنتظرك. 👑"
+                    )
+                except:
+                    pass
+
+                if level in LEVEL_ROLES:
+                    keyword = LEVEL_ROLES[level].lower()
+                    new_role = None
+                    for r in message.guild.roles:
+                        if keyword in r.name.lower():
+                            new_role = r
+                            break
+
+                    if new_role:
+                        try:
+                            roles_to_remove = []
+                            all_keywords = [kw.lower() for kw in LEVEL_ROLES.values()]
+                            for r in message.author.roles:
+                                if any(kw in r.name.lower() for kw in all_keywords):
+                                    if r.id != new_role.id:
+                                        roles_to_remove.append(r)
+
+                            if roles_to_remove:
+                                await message.author.remove_roles(*roles_to_remove)
+
+                            await message.author.add_roles(new_role)
+                            await message.channel.send(f"🎁 تم ترقيتك وحصولك على رتبة {new_role.mention} وإزالة رتبتك السابقة!")
+                        except Exception as e:
+                            print(f"❌ خطأ في تحديث رتب التلفل: {e}")
+
+            self.cursor.execute("UPDATE users SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?", (xp, level, user_id, guild_id))
+        self.conn.commit()
+
+    @app_commands.command(name="rank", description="عرض بطاقة مستواك ونقاط الخبرة")
+    async def rank(self, interaction: discord.Interaction, member: discord.Member = None):
+        await interaction.response.defer()
+        target = member or interaction.user
         
-        # ترتيب البيانات
-        sorted_users = sorted(data.items(), key=lambda item: item[1]["xp"], reverse=True)
-        
-        # إرسال الرسالة مع الأزرار
-        view = TopView(sorted_users, interaction)
-        await interaction.response.send_message(embed=view.get_embed(), view=view)
+        self.cursor.execute("SELECT xp, level FROM users WHERE user_id = ? AND guild_id = ?", (target.id, interaction.guild.id))
+        result = self.cursor.fetchone()
+
+        if result is None:
+            xp, level = 0, 0
+        else:
+            xp, level = result
+
+        card_file = await generate_rank_card(target, xp, level)
+        if card_file:
+            await interaction.followup.send(file=card_file)
+        else:
+            await interaction.followup.send(f"❌ حدث خطأ أثناء إنشاء بطاقة الرانك لـ {target.mention}.", ephemeral=True)
 
 async def setup(bot):
-    await bot.add_cog(Stats(bot))
+    await bot.add_cog(Leveling(bot))
