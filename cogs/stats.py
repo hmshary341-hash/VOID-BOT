@@ -9,6 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 # --- الإعدادات الأساسية ---
 LEVEL_UP_CHANNEL_ID = 1530087509407563797  # آي دي روم إرسال رسائل التلفل
+OWNER_ID = 1529995977203777566  # آي دي الحساب المخصص لتصفير المستويات
 
 # --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
 LEVEL_ROLES = {
@@ -34,7 +35,7 @@ CARD_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/153031
 
 
 async def generate_card(member, xp, level, role_name="Member"):
-  """وظيفة تصميم البطاقة ودمج الصورة، اللفل، ورتبة العضو بدقة"""
+  """وظيفة تصميم البطاقة ووضع صورة العضو داخل الدائرة الكبرى بدقة"""
   try:
     async with aiohttp.ClientSession() as session:
       # تحميل الخلفية
@@ -55,7 +56,7 @@ async def generate_card(member, xp, level, role_name="Member"):
     avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
 
     # حجم وإحداثيات الأفتار داخل الدائرة الكبرى على اليسار
-    avatar_size = 295
+    avatar_size = 250
     avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
 
     # إنشاء قناع دائري لقص الأفتار
@@ -63,26 +64,26 @@ async def generate_card(member, xp, level, role_name="Member"):
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
 
-    avatar_coords = (115, 95)
+    # إحداثيات مركز الدائرة الكبيرة في اليسار
+    avatar_coords = (130, 185)
     bg.paste(avatar, avatar_coords, mask)
 
-    # رسم النصوص (رقم اللفل واسم الرتبة تحت الصورة)
+    # رسم النصوص (رقم اللفل واسم الرتبة)
     draw = ImageDraw.Draw(bg)
 
     try:
       font_level = ImageFont.truetype("arial.ttf", 95)
-      font_role = ImageFont.truetype("arial.ttf", 26)
+      font_role = ImageFont.truetype("arial.ttf", 24)
     except:
       font_level = ImageFont.load_default()
       font_role = ImageFont.load_default()
 
-    # 1. كتابة رقم اللفل فوق المكان المخصص له بالضبط
+    # 1. كتابة رقم اللفل فوق المكان المخصص له بدقة
     level_text = str(level)
     draw.text((615, 340), level_text, fill=(216, 180, 255), font=font_level)
 
-    # 2. كتابة اسم الرتبة الجديدة تحت صورة العضو مباشرة (تحت الدائرة)
-    # إحداثيات تحت الدائرة اليسرى
-    draw.text((180, 405), f"Rank: {role_name}", fill=(255, 215, 0), font=font_role)
+    # 2. كتابة اسم الرتبة تحت الدائرة الكبرى
+    draw.text((160, 445), f"Rank: {role_name}", fill=(255, 215, 0), font=font_role)
 
     # حفظ الصورة في ذاكرة مؤقتة للإرسال
     output = BytesIO()
@@ -122,7 +123,6 @@ class Leveling(commands.Cog):
     user_id = message.author.id
     guild_id = message.guild.id
 
-    # كسب نقاط خبرة عشوائية مع كل رسالة (بين 15 و 25 نقطة)
     earned_xp = random.randint(15, 25)
 
     self.cursor.execute(
@@ -147,14 +147,12 @@ class Leveling(commands.Cog):
         level += 1
         xp -= next_level_xp
 
-        # تحديد اسم الرتبة الحالية للعضو بناءً على مستواه
         current_role_name = "Member"
         for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
           if level >= lvl:
             current_role_name = r_name
             break
 
-        # إرسال بطاقة التلفل المصممة في الروم المخصص فقط
         target_channel = message.guild.get_channel(LEVEL_UP_CHANNEL_ID)
         if target_channel:
           try:
@@ -172,7 +170,6 @@ class Leveling(commands.Cog):
           except Exception as e:
             print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
 
-        # إدارة الرتب التلقائية
         if level in LEVEL_ROLES:
           keyword = LEVEL_ROLES[level].lower()
           new_role = None
@@ -221,7 +218,6 @@ class Leveling(commands.Cog):
     else:
       xp, level = result
 
-    # جلب اسم رتبته الحالية لعرضها على البطاقة
     current_role_name = "Member"
     for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
       if level >= lvl:
@@ -236,6 +232,24 @@ class Leveling(commands.Cog):
           f"❌ حدث خطأ أثناء إنشاء بطاقة الرانك لـ {target.mention}.",
           ephemeral=True,
       )
+
+  @app_commands.command(
+      name="reset_levels", description="تصفير مستويات ونقاط الجميع (مخصص لك فقط)"
+  )
+  async def reset_levels(self, interaction: discord.Interaction):
+    if interaction.user.id != OWNER_ID:
+      await interaction.response.send_message(
+          "❌ | عذراً، هذا الأمر مخصص لصاحب السيرفر فقط!", ephemeral=True
+      )
+      return
+
+    self.cursor.execute(
+        "DELETE FROM users WHERE guild_id = ?", (interaction.guild.id,)
+    )
+    self.conn.commit()
+    await interaction.response.send_message(
+        "🔄 | تم تصفير جميع المستويات والنقاط في السيرفر بنجاح!", ephemeral=True
+    )
 
 
 async def setup(bot):
