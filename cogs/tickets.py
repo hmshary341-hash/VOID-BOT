@@ -6,11 +6,21 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# الإعدادات
-CATEGORY_ID = 1525952823156801576
-STAFF_ROLE_ID = 1527807423186862080
-LOG_CHANNEL_ID = 1527750890952462408
+# --- الإعدادات الأساسية ---
+CATEGORY_ID = 1530047675028865175         # آي دي فئة التذاكر
+TICKET_CHANNEL_ID = 1530048038666506290   # آي دي روم التكت الأساسي
+LOG_CHANNEL_ID = 1527750890952462408      # آي دي روم اللوجز
 IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
+
+# --- أسماء الرتب الإدارية والدعم الفني ---
+SUPPORT_ROLE_NAMES = [
+    "Owner",
+    "Co-Owner",
+    "Bot server",
+    "Support Manager",
+    "Senior Support",
+    "Support Staff"
+]
 
 # --- الأزرار الخاصة داخل التذكرة ---
 class TicketActions(discord.ui.View):
@@ -33,7 +43,6 @@ class TicketActions(discord.ui.View):
 
     @discord.ui.button(label="قفل", style=discord.ButtonStyle.secondary, emoji="🔒", custom_id="lock_ticket")
     async def lock(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # تم التصحيح لتقفل على صاحب التذكرة (opener) بدلاً من الشخص الضاغط
         target = self.opener if self.opener else interaction.user
         await interaction.channel.set_permissions(target, send_messages=False)
         await interaction.response.send_message("🔒 تم قفل التذكرة لصاحبها.", ephemeral=True)
@@ -67,11 +76,11 @@ class TicketActions(discord.ui.View):
             
         await interaction.channel.delete()
 
-# --- المودال (للإبلاغات) ---
-class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
+# --- نموذج الشكاوى (إداري أو عضو) ---
+class ReportModal(discord.ui.Modal, title='نموذج الشكوى'):
     target = discord.ui.TextInput(label='يوزر الشخص المبلغ عنه', style=discord.TextStyle.short, required=True)
-    reason = discord.ui.TextInput(label='السبب', style=discord.TextStyle.paragraph, required=True)
-    proof = discord.ui.TextInput(label='الدليل (رابط الصورة)', style=discord.TextStyle.short, required=True)
+    reason = discord.ui.TextInput(label='السبب بالتفصيل', style=discord.TextStyle.paragraph, required=True)
+    proof = discord.ui.TextInput(label='الدليل (رابط الصورة/فيديو)', style=discord.TextStyle.short, required=True)
 
     def __init__(self, report_type):
         super().__init__()
@@ -87,29 +96,75 @@ class ReportModal(discord.ui.Modal, title='نموذج الإبلاغ'):
         await channel.set_permissions(interaction.guild.default_role, read_messages=False)
         await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
         
-        embed = discord.Embed(title=f"تذكرة {self.report_type} | #{ticket_num}", color=discord.Color.dark_purple())
+        for r_name in SUPPORT_ROLE_NAMES:
+            role = discord.utils.get(interaction.guild.roles, name=r_name)
+            if role:
+                await channel.set_permissions(role, read_messages=True, send_messages=True)
+        
+        embed = discord.Embed(title=f"{self.report_type} | #{ticket_num}", color=discord.Color.dark_purple())
         embed.add_field(name="👤 المشتكي", value=interaction.user.mention, inline=False)
         embed.add_field(name="المبلغ عنه", value=self.target.value, inline=False)
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
         embed.set_image(url=IMAGE_URL)
         
-        await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions(opener=interaction.user))
-        await interaction.followup.send(f"✅ تم فتح تذكرتك: {channel.mention}", ephemeral=True)
+        support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
+        mention_text = support_role.mention if support_role else "@here"
+        
+        await channel.send(mention_text, embed=embed, view=TicketActions(opener=interaction.user))
+        await interaction.followup.send(f"✅ تم فتح تذكرتك بنجاح: {channel.mention}", ephemeral=True)
 
-# --- قائمة الاختيار ---
+# --- نموذج توثيق البنات ---
+class VerificationModal(discord.ui.Modal, title='نموذج توثيق البنات'):
+    proof = discord.ui.TextInput(label='رابط صورة التحقق / الدليل', style=discord.TextStyle.short, required=True, placeholder="ضع رابط الصورة هنا")
+    notes = discord.ui.TextInput(label='ملاحظات إضافية (اختياري)', style=discord.TextStyle.paragraph, required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        ticket_num = random.randint(1000, 9999)
+        category = interaction.guild.get_channel(CATEGORY_ID)
+        channel = await interaction.guild.create_text_channel(name=f"verify-{ticket_num}", category=category)
+        
+        await channel.set_permissions(interaction.guild.default_role, read_messages=False)
+        await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
+        
+        for r_name in SUPPORT_ROLE_NAMES:
+            role = discord.utils.get(interaction.guild.roles, name=r_name)
+            if role:
+                await channel.set_permissions(role, read_messages=True, send_messages=True)
+        
+        embed = discord.Embed(title=f"تذكرة توثيق البنات | #{ticket_num}", description="يرجى انتظار مراجعة الإدارة للطلب الخاص بك.", color=discord.Color.magenta())
+        embed.add_field(name="👤 صاحبة الطلب", value=interaction.user.mention, inline=False)
+        embed.add_field(name="🖼️ الدليل المقدم", value=self.proof.value, inline=False)
+        if self.notes.value:
+            embed.add_field(name="📝 ملاحظات", value=self.notes.value, inline=False)
+        embed.set_image(url=IMAGE_URL)
+        
+        support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
+        mention_text = support_role.mention if support_role else "@here"
+        
+        await channel.send(mention_text, embed=embed, view=TicketActions(opener=interaction.user))
+        await interaction.followup.send(f"✅ تم فتح تذكرة التوثيق بنجاح: {channel.mention}", ephemeral=True)
+
+# --- قائمة الاختيار المطابقة للصورة ---
 class TicketSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(placeholder='اختر نوع التذكرة...', options=[
-            discord.SelectOption(label='إبلاغ عن إداري', value='إبلاغ عن إداري', emoji='🛡️'),
-            discord.SelectOption(label='إبلاغ عن عضو', value='إبلاغ عن عضو', emoji='👤'),
-            discord.SelectOption(label='استفسار', value='استفسار', emoji='❓'),
+        super().__init__(placeholder='اختر نوع التذكرة المناسبة من الخيارات أدناه...', options=[
+            discord.SelectOption(label='شكوى على إداري', value='شكوى على إداري', description='تقديم شكوى ضد أحد الإداريين بسبب إساءة أو مخالفة', emoji='🛡️'),
+            discord.SelectOption(label='شكوى على عضو', value='شكوى على عضو', description='تقديم شكوى ضد أحد الأعضاء بسبب إساءة أو مخالفة', emoji='👤'),
+            discord.SelectOption(label='إستفسار', value='إستفسار', description='لطرح سؤال أو طلب مساعدة بخصوص أي موضوع', emoji='💬'),
+            discord.SelectOption(label='توثيق البنات', value='توثيق البنات', description='لتوثيق حساب البنات للحصول على رتبة خاصة', emoji='👧'),
         ], custom_id="ticket_select_persistent")
 
     async def callback(self, interaction: discord.Interaction):
-        if self.values[0] in ['إبلاغ عن إداري', 'إبلاغ عن عضو']:
-            await interaction.response.send_modal(ReportModal(report_type=self.values[0]))
-        else:
+        if self.values[0] == 'شكوى على إداري':
+            await interaction.response.send_modal(ReportModal(report_type='شكوى على إداري'))
+        elif self.values[0] == 'شكوى على عضو':
+            await interaction.response.send_modal(ReportModal(report_type='شكوى على عضو'))
+        elif self.values[0] == 'توثيق البنات':
+            await interaction.response.send_modal(VerificationModal())
+        elif self.values[0] == 'إستفسار':
             await interaction.response.defer(ephemeral=True)
             
             ticket_num = random.randint(1000, 9999)
@@ -119,11 +174,19 @@ class TicketSelect(discord.ui.Select):
             await channel.set_permissions(interaction.guild.default_role, read_messages=False)
             await channel.set_permissions(interaction.user, read_messages=True, send_messages=True)
             
-            embed = discord.Embed(title=f"تذكرة استفسار | #{ticket_num}", description="يرجى كتابة استفسارك هنا وسيقوم الإدارة بالرد عليك قريباً.", color=discord.Color.blue())
+            for r_name in SUPPORT_ROLE_NAMES:
+                role = discord.utils.get(interaction.guild.roles, name=r_name)
+                if role:
+                    await channel.set_permissions(role, read_messages=True, send_messages=True)
+            
+            embed = discord.Embed(title=f"تذكرة إستفسار | #{ticket_num}", description="يرجى كتابة استفسارك هنا وسيقوم الدعم الفني بالرد عليك قريباً.", color=discord.Color.blue())
             embed.add_field(name="👤 صاحب الاستفسار", value=interaction.user.mention, inline=False)
             embed.set_image(url=IMAGE_URL)
             
-            await channel.send(f"<@&{STAFF_ROLE_ID}>", embed=embed, view=TicketActions(opener=interaction.user))
+            support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
+            mention_text = support_role.mention if support_role else "@here"
+            
+            await channel.send(mention_text, embed=embed, view=TicketActions(opener=interaction.user))
             await interaction.followup.send(f"✅ تم فتح تذكرة الاستفسار بنجاح: {channel.mention}", ephemeral=True)
 
 class OpenTicketView(discord.ui.View):
@@ -135,12 +198,20 @@ class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ticket", description="إرسال رسالة نظام التذاكر")
+    @app_commands.command(name="ticket", description="إرسال لوحة نظام التذاكر")
     @app_commands.checks.has_permissions(administrator=True)
     async def send_ticket(self, interaction: discord.Interaction):
-        embed = discord.Embed(title="VOID | مركز الدعم", description="اختر نوع الطلب أدناه:", color=discord.Color.blue())
+        if interaction.channel.id != TICKET_CHANNEL_ID:
+            return await interaction.response.send_message(f"❌ عذراً، يجب استخدام هذا الأمر داخل روم التذاكر المخصص فقط <#{TICKET_CHANNEL_ID}>.", ephemeral=True)
+            
+        embed = discord.Embed(
+            title="نظام التذاكر", 
+            description="اختر نوع التذكرة المناسبة من الخيارات أدناه.\n\n> ⚠️ **ملاحظات مهمة:**\n> • يرجى اختيار القسم المناسب لمشكلتك.\n> • التذاكر غير المناسبة يتم إغلاقها دون مراجعة.\n> • سيتم الرد عليك في أقرب وقت ممكن.", 
+            color=discord.Color.dark_gold()
+        )
         embed.set_image(url=IMAGE_URL)
         await interaction.response.send_message(embed=embed, view=OpenTicketView())
+        await interaction.followup.send("✅ تم إرسال لوحة التذاكر بنجاح.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Tickets(bot))
