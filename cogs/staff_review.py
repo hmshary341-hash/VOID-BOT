@@ -2,8 +2,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-PUBLIC_REVIEW_CHANNEL_ID = 1528075992546148544  # روم التقييم العام
-ADMIN_LOG_CHANNEL_ID = 1528077108729876620  # روم الإدارة السري
+PUBLIC_REVIEW_CHANNEL_ID = 1530048730139590697  # روم تقييم الإدارة الجديد
+ADMIN_LOG_CHANNEL_ID = 1530295845000581200  # روم الإدارة السري الجديد
 SERVER_LOGO_URL = "https://i.ibb.co/3mN68wM/VOID-Logo.png"
 
 class ReviewModal(discord.ui.Modal):
@@ -45,6 +45,9 @@ class StaffReview(commands.Cog):
     @app_commands.command(name="setup_review", description="إرسال لوحة تقييم الإدارة في القناة الحالية")
     @app_commands.checks.has_permissions(administrator=True)
     async def setup_review(self, interaction: discord.Interaction):
+        if interaction.channel.id != PUBLIC_REVIEW_CHANNEL_ID:
+            return await interaction.response.send_message(f"❌ عذراً، يجب استخدام هذا الأمر داخل روم تقييم الإدارة المخصص فقط <#{PUBLIC_REVIEW_CHANNEL_ID}>.", ephemeral=True)
+            
         embed = discord.Embed(
             title="⭐ تقييم الطاقم الإداري", 
             description="مرحباً بك في قسم تقييم الإدارة لـ **VOID**.\n\nيسعدنا سماع آرائكم بكل شفافية وبسرية تامة.\n\n**اضغط على الزر بالأسفل للبدء 👇**", 
