@@ -44,6 +44,32 @@ LEVEL_ROLES = {
 # --- رابط بطاقة الرانك الدائم ---
 CARD_BG_URL = "https://i.imgur.com/OWCueg0.png"
 
+# --- ألوان الخلفية البديلة (RGB) ---
+FALLBACK_BG_COLOR = (30, 30, 50)  # لون أزرق داكن
+CARD_WIDTH = 800
+CARD_HEIGHT = 450
+
+
+def create_fallback_background(width: int = CARD_WIDTH, height: int = CARD_HEIGHT) -> bytes:
+  """إنشاء خلفية بديلة بسيطة باستخدام لون صلب"""
+  try:
+    bg = Image.new("RGBA", (width, height), FALLBACK_BG_COLOR)
+    
+    # إضافة تدرج بسيط للمظهر
+    draw = ImageDraw.Draw(bg)
+    
+    # رسم خطوط زخرفية
+    for i in range(0, width, 50):
+      draw.line([(i, 0), (i + 20, height)], fill=(100, 100, 150, 80), width=2)
+    
+    output = BytesIO()
+    bg.save(output, format="PNG")
+    output.seek(0)
+    return output.getvalue()
+  except Exception as e:
+    print(f"❌ خطأ في إنشاء الخلفية البديلة: {e}")
+    return None
+
 
 class ImageCache:
   """فئة لإدارة تخزين الصور مؤقتاً ومنع أخطاء 429"""
@@ -66,7 +92,7 @@ class ImageCache:
     file_age = datetime.now() - datetime.fromtimestamp(cache_path.stat().st_mtime)
     return file_age < timedelta(days=CACHE_MAX_AGE_DAYS)
   
-  async def get_image(self, url: str, session: aiohttp.ClientSession) -> bytes:
+  async def get_image(self, url: str, session: aiohttp.ClientSession, allow_fallback: bool = False) -> bytes:
     """الحصول على الصورة من الكاش أو تحميلها من الإنترنت"""
     cache_path = self.get_cache_path(url)
     
@@ -88,7 +114,12 @@ class ImageCache:
     try:
       async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
         if resp.status != 200:
-          print(f"❌ فشل تحميل الصورة من {url}، كود الاستجابة: {resp.status}")
+          print(f"⚠️ فشل تحميل الصورة من {url}، كود الاستجابة: {resp.status}")
+          
+          # إذا كانت الخلفية وسُمح بالبديل، استخدم الخلفية الافتراضية
+          if allow_fallback:
+            print("ℹ️ استخدام الخلفية البديلة")
+            return create_fallback_background()
           return None
         
         image_data = await resp.read()
@@ -103,10 +134,16 @@ class ImageCache:
         self.last_request_time[url] = asyncio.get_event_loop().time()
         return image_data
     except asyncio.TimeoutError:
-      print(f"❌ انتهت مهلة الاتصال عند تحميل {url}")
+      print(f"⚠️ انتهت مهلة الاتصال عند تحميل {url}")
+      if allow_fallback:
+        print("ℹ️ استخدام الخلفية البديلة")
+        return create_fallback_background()
       return None
     except Exception as e:
-      print(f"❌ خطأ في تحميل الصورة من {url}: {e}")
+      print(f"⚠️ خطأ في تحميل الصورة من {url}: {e}")
+      if allow_fallback:
+        print("ℹ️ استخدام الخلفية البديلة")
+        return create_fallback_background()
       return None
 
 
@@ -118,15 +155,15 @@ async def generate_card(member, xp, level, role_name="Member"):
   """وظيفة تصميم البطاقة ووضع صورة العضو داخل الإطار الدائري بدقة"""
   try:
     async with aiohttp.ClientSession() as session:
-      # تحميل الخلفية من الكاش
-      bg_data = await image_cache.get_image(CARD_BG_URL, session)
+      # تحميل الخلفية من الكاش (مع بديل)
+      bg_data = await image_cache.get_image(CARD_BG_URL, session, allow_fallback=True)
       if not bg_data:
-        print(f"❌ فشل تحميل خلفية البطاقة")
+        print(f"❌ فشل الحصول على خلفية البطاقة حتى مع البديل")
         return None
 
-      # تحميل صورة بروفايل العضو
+      # تحميل صورة بروفايل العضو (بدون بديل - صورة العضو ضرورية)
       avatar_url = member.display_avatar.with_format("png").url
-      avatar_data = await image_cache.get_image(avatar_url, session)
+      avatar_data = await image_cache.get_image(avatar_url, session, allow_fallback=False)
       if not avatar_data:
         print(f"❌ فشل تحميل أفتار العضو")
         return None
