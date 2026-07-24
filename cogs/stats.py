@@ -29,116 +29,68 @@ LEVEL_ROLES = {
     100: "Eternal",
 }
 
-# --- روابط الصور ---
-RANK_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530310291772936486/file_000000000fcc82469984187e529362ed.png?ex=6a651c05&is=6a63ca85&hm=51ebd4f8b36da10396d71d9db06a61ce5836d6ca7fb1587b41597118795d5387&"
-LEVEL_UP_BG_URL = "رابط_صورة_بطاقة_التلفل_التي_أرسلتها_هنا"  # ضع رابط الصورة التي أرسلتها في الأعلى هنا
+# --- رابط بطاقة الرانك / التلفل الأساسية ---
+CARD_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530310291772936486/file_000000000fcc82469984187e529362ed.png?ex=6a651c05&is=6a63ca85&hm=51ebd4f8b36da10396d71d9db06a61ce5836d6ca7fb1587b41597118795d5387&"
 
 
-async def generate_rank_card(member, xp, level):
-  """تصميم بطاقة أمر /rank"""
+async def generate_card(member, xp, level, role_name="Member"):
+  """وظيفة تصميم البطاقة ودمج الصورة، اللفل، ورتبة العضو بدقة"""
   try:
     async with aiohttp.ClientSession() as session:
-      async with session.get(RANK_BG_URL) as resp:
+      # تحميل الخلفية
+      async with session.get(CARD_BG_URL) as resp:
         if resp.status != 200:
           return None
         bg_data = await resp.read()
 
+      # تحميل صورة بروفايل العضو
       avatar_url = member.display_avatar.with_format("png").url
       async with session.get(avatar_url) as resp:
         if resp.status != 200:
           return None
         avatar_data = await resp.read()
 
+    # فتح الصور باستخدام Pillow
     bg = Image.open(BytesIO(bg_data)).convert("RGBA")
     avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
 
-    avatar_size = 150
+    # حجم وإحداثيات الأفتار داخل الدائرة الكبرى على اليسار
+    avatar_size = 295
     avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
 
+    # إنشاء قناع دائري لقص الأفتار
     mask = Image.new("L", (avatar_size, avatar_size), 0)
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
 
-    bg.paste(avatar, (50, 50), mask)
-    draw = ImageDraw.Draw(bg)
-
-    try:
-      font_large = ImageFont.truetype("arial.ttf", 36)
-      font_small = ImageFont.truetype("arial.ttf", 24)
-    except:
-      font_large = ImageFont.load_default()
-      font_small = ImageFont.load_default()
-
-    next_level_xp = (level + 1) * 100
-
-    draw.text(
-        (230, 60), f"{member.display_name}", fill=(255, 255, 255), font=font_large
-    )
-    draw.text((230, 110), f"Level: {level}", fill=(170, 130, 255), font=font_small)
-    draw.text(
-        (230, 150),
-        f"XP: {xp} / {next_level_xp}",
-        fill=(200, 200, 200),
-        font=font_small,
-    )
-
-    output = BytesIO()
-    bg.save(output, format="PNG")
-    output.seek(0)
-    return discord.File(output, filename="rank.png")
-  except Exception as e:
-    print(f"❌ خطأ في إنشاء بطاقة الرانك: {e}")
-    return None
-
-
-async def generate_level_up_card(member, level):
-  """تصميم بطاقة صعود اللفل بناءً على الصورة الجديدة مع دمج صورة العضو واللفل"""
-  try:
-    async with aiohttp.ClientSession() as session:
-      async with session.get(LEVEL_UP_BG_URL) as resp:
-        if resp.status != 200:
-          return None
-        bg_data = await resp.read()
-
-      avatar_url = member.display_avatar.with_format("png").url
-      async with session.get(avatar_url) as resp:
-        if resp.status != 200:
-          return None
-        avatar_data = await resp.read()
-
-    bg = Image.open(BytesIO(bg_data)).convert("RGBA")
-    avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
-
-    # 📌 تعديل حجم وموقع الأفتار ليطابق الدائرة الكبيرة في يسار التصميم الجديد
-    avatar_size = 280  # حجم الأفتار الداخلي
-    avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
-
-    mask = Image.new("L", (avatar_size, avatar_size), 0)
-    draw_mask = ImageDraw.Draw(mask)
-    draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
-
-    # إحداثيات الدائرة اليسرى في البطاقة الجديدة (يمكنك تعديلها بدقة إذا لزم الأمر)
-    avatar_coords = (125, 175)
+    avatar_coords = (115, 95)
     bg.paste(avatar, avatar_coords, mask)
 
+    # رسم النصوص (رقم اللفل واسم الرتبة تحت الصورة)
     draw = ImageDraw.Draw(bg)
 
     try:
-      font_level = ImageFont.truetype("arial.ttf", 90)
+      font_level = ImageFont.truetype("arial.ttf", 95)
+      font_role = ImageFont.truetype("arial.ttf", 26)
     except:
       font_level = ImageFont.load_default()
+      font_role = ImageFont.load_default()
 
-    # كتابة رقم اللفل الجديد في مكان رقم 15 في الصورة
+    # 1. كتابة رقم اللفل فوق المكان المخصص له بالضبط
     level_text = str(level)
-    # إحداثيات كتابة رقم اللفل (حسب مكان رقم 15 في تصميمك)
-    draw.text((615, 360), level_text, fill=(216, 180, 255), font=font_level)
+    draw.text((615, 340), level_text, fill=(216, 180, 255), font=font_level)
 
+    # 2. كتابة اسم الرتبة الجديدة تحت صورة العضو مباشرة (تحت الدائرة)
+    # إحداثيات تحت الدائرة اليسرى
+    draw.text((180, 405), f"Rank: {role_name}", fill=(255, 215, 0), font=font_role)
+
+    # حفظ الصورة في ذاكرة مؤقتة للإرسال
     output = BytesIO()
     bg.save(output, format="PNG")
     output.seek(0)
-    return discord.File(output, filename="levelup.png")
+    return discord.File(output, filename="card.png")
   except Exception as e:
-    print(f"❌ خطأ في إنشاء بطاقة التلفل: {e}")
+    print(f"❌ خطأ في إنشاء البطاقة: {e}")
     return None
 
 
@@ -170,6 +122,7 @@ class Leveling(commands.Cog):
     user_id = message.author.id
     guild_id = message.guild.id
 
+    # كسب نقاط خبرة عشوائية مع كل رسالة (بين 15 و 25 نقطة)
     earned_xp = random.randint(15, 25)
 
     self.cursor.execute(
@@ -194,11 +147,20 @@ class Leveling(commands.Cog):
         level += 1
         xp -= next_level_xp
 
-        # إرسال بطاقة التلفل المصممة في الروم المحدد فقط
+        # تحديد اسم الرتبة الحالية للعضو بناءً على مستواه
+        current_role_name = "Member"
+        for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
+          if level >= lvl:
+            current_role_name = r_name
+            break
+
+        # إرسال بطاقة التلفل المصممة في الروم المخصص فقط
         target_channel = message.guild.get_channel(LEVEL_UP_CHANNEL_ID)
         if target_channel:
           try:
-            card_file = await generate_level_up_card(message.author, level)
+            card_file = await generate_card(
+                message.author, xp, level, current_role_name
+            )
             if card_file:
               await target_channel.send(
                   content=f"{message.author.mention}", file=card_file
@@ -210,6 +172,7 @@ class Leveling(commands.Cog):
           except Exception as e:
             print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
 
+        # إدارة الرتب التلقائية
         if level in LEVEL_ROLES:
           keyword = LEVEL_ROLES[level].lower()
           new_role = None
@@ -231,11 +194,6 @@ class Leveling(commands.Cog):
                 await message.author.remove_roles(*roles_to_remove)
 
               await message.author.add_roles(new_role)
-              if target_channel:
-                await target_channel.send(
-                    f"🎁 تم ترقيتك وحصولك على رتبة {new_role.mention} وإزالة"
-                    " رتبتك السابقة!"
-                )
             except Exception as e:
               print(f"❌ خطأ في تحديث رتب التلفل: {e}")
 
@@ -263,7 +221,14 @@ class Leveling(commands.Cog):
     else:
       xp, level = result
 
-    card_file = await generate_rank_card(target, xp, level)
+    # جلب اسم رتبته الحالية لعرضها على البطاقة
+    current_role_name = "Member"
+    for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
+      if level >= lvl:
+        current_role_name = r_name
+        break
+
+    card_file = await generate_card(target, xp, level, current_role_name)
     if card_file:
       await interaction.followup.send(file=card_file, ephemeral=True)
     else:
