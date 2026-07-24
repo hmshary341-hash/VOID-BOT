@@ -29,12 +29,13 @@ LEVEL_ROLES = {
     100: "Eternal",
 }
 
-# --- رابط خلفية بطاقة الرانك ---
+# --- روابط الصور ---
 RANK_BG_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530310291772936486/file_000000000fcc82469984187e529362ed.png?ex=6a651c05&is=6a63ca85&hm=51ebd4f8b36da10396d71d9db06a61ce5836d6ca7fb1587b41597118795d5387&"
+LEVEL_UP_BG_URL = "رابط_صورة_بطاقة_التلفل_التي_أرسلتها_هنا"  # ضع رابط الصورة التي أرسلتها في الأعلى هنا
 
 
 async def generate_rank_card(member, xp, level):
-  """وظيفة رسم وتصميم بطاقة الرانك تلقائياً"""
+  """تصميم بطاقة أمر /rank"""
   try:
     async with aiohttp.ClientSession() as session:
       async with session.get(RANK_BG_URL) as resp:
@@ -59,7 +60,6 @@ async def generate_rank_card(member, xp, level):
     draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
 
     bg.paste(avatar, (50, 50), mask)
-
     draw = ImageDraw.Draw(bg)
 
     try:
@@ -88,6 +88,57 @@ async def generate_rank_card(member, xp, level):
     return discord.File(output, filename="rank.png")
   except Exception as e:
     print(f"❌ خطأ في إنشاء بطاقة الرانك: {e}")
+    return None
+
+
+async def generate_level_up_card(member, level):
+  """تصميم بطاقة صعود اللفل بناءً على الصورة الجديدة مع دمج صورة العضو واللفل"""
+  try:
+    async with aiohttp.ClientSession() as session:
+      async with session.get(LEVEL_UP_BG_URL) as resp:
+        if resp.status != 200:
+          return None
+        bg_data = await resp.read()
+
+      avatar_url = member.display_avatar.with_format("png").url
+      async with session.get(avatar_url) as resp:
+        if resp.status != 200:
+          return None
+        avatar_data = await resp.read()
+
+    bg = Image.open(BytesIO(bg_data)).convert("RGBA")
+    avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
+
+    # 📌 تعديل حجم وموقع الأفتار ليطابق الدائرة الكبيرة في يسار التصميم الجديد
+    avatar_size = 280  # حجم الأفتار الداخلي
+    avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+
+    mask = Image.new("L", (avatar_size, avatar_size), 0)
+    draw_mask = ImageDraw.Draw(mask)
+    draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
+
+    # إحداثيات الدائرة اليسرى في البطاقة الجديدة (يمكنك تعديلها بدقة إذا لزم الأمر)
+    avatar_coords = (125, 175)
+    bg.paste(avatar, avatar_coords, mask)
+
+    draw = ImageDraw.Draw(bg)
+
+    try:
+      font_level = ImageFont.truetype("arial.ttf", 90)
+    except:
+      font_level = ImageFont.load_default()
+
+    # كتابة رقم اللفل الجديد في مكان رقم 15 في الصورة
+    level_text = str(level)
+    # إحداثيات كتابة رقم اللفل (حسب مكان رقم 15 في تصميمك)
+    draw.text((615, 360), level_text, fill=(216, 180, 255), font=font_level)
+
+    output = BytesIO()
+    bg.save(output, format="PNG")
+    output.seek(0)
+    return discord.File(output, filename="levelup.png")
+  except Exception as e:
+    print(f"❌ خطأ في إنشاء بطاقة التلفل: {e}")
     return None
 
 
@@ -143,20 +194,21 @@ class Leveling(commands.Cog):
         level += 1
         xp -= next_level_xp
 
-        # إرسال رسالة التلفل في الروم المحدد فقط
+        # إرسال بطاقة التلفل المصممة في الروم المحدد فقط
         target_channel = message.guild.get_channel(LEVEL_UP_CHANNEL_ID)
         if target_channel:
           try:
-            remaining_xp = (level + 1) * 100 - xp
-            await target_channel.send(
-                f"{message.author.mention}\n"
-                f"⚡ | لفل جديد! {level}\n"
-                f"يا فله، التفاعل حقك رهيب! 🔥\n"
-                f"شد حيلك وكمل، القمة تنتظرك. 👑\n"
-                f"📊 النقاط المطلوبة للفل التالي: `{remaining_xp} XP`"
-            )
+            card_file = await generate_level_up_card(message.author, level)
+            if card_file:
+              await target_channel.send(
+                  content=f"{message.author.mention}", file=card_file
+              )
+            else:
+              await target_channel.send(
+                  f"🎉 مبروك {message.author.mention}! لقد صعدت للمستوى **{level}**!"
+              )
           except Exception as e:
-            print(f"❌ خطأ في إرسال رسالة التلفل: {e}")
+            print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
 
         if level in LEVEL_ROLES:
           keyword = LEVEL_ROLES[level].lower()
