@@ -1,125 +1,83 @@
-import io
+from io import BytesIO
 import aiohttp
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont, ImageOps
-import arabic_reshaper
-from bidi.algorithm import get_display
+from PIL import Image, ImageDraw
 
-# الإعدادات
-WELCOME_CHANNEL_ID = 1525595451607486535  # آي دي قناة الترحيب
-LEAVE_CHANNEL_ID = 1527103575946297415    # آي دي قناة المغادرة
-BACKGROUND_IMAGE_URL = "https://cdn.discordapp.com/attachments/1526978453826699324/1528190964215320778/file_00000000da1c71f4863b28202a995e4e.png"
+# --- الإعدادات الأساسية ---
+WELCOME_CHANNEL_ID = 1530041963284529262  # آي دي روم الترحيب
+GOODBYE_CHANNEL_ID = 1530301291182428250  # آي دي روم المغادرة
 
-class WelcomeLeave(commands.Cog):
+# --- روابط الصور الأساسية ---
+WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530304966382714931/file_0000000008888246b4d2751df8b9b359.png?ex=6a65170f&is=6a63c58f&hm=542c5d6cba67078eda564bb07e3a7ac0ea473af1d1bbfe7e826735144ffb5cb5&"
+GOODBYE_IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530305816064950502/file_0000000068548246a1b7a5f97361f560.png?ex=6a6517da&is=6a63c65a&hm=bb8706d4d55bb6448297b6d9277a0879dcff541d2793c84e74b38b7eab778cfe&"
+
+async def create_custom_card(member, bg_url, circle_coords=(65, 65), circle_size=265):
+    """وظيفة لدمج صورة بروفايل العضو داخل الدائرة في التصميم"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            # تحميل صورة الخلفية
+            async with session.get(bg_url) as resp:
+                if resp.status != 200: return None
+                bg_data = await resp.read()
+
+            # تحميل صورة بروفايل العضو
+            avatar_url = member.display_avatar.with_format("png").url
+            async with session.get(avatar_url) as resp:
+                if resp.status != 200: return None
+                avatar_data = await resp.read()
+
+        # معالجة الصور باستخدام Pillow
+        bg = Image.open(BytesIO(bg_data)).convert("RGBA")
+        avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
+
+        # تغيير حجم الأفتار ليطابق حجم الدائرة
+        avatar = avatar.resize((circle_size, circle_size), Image.Resampling.LANCZOS)
+
+        # إنشاء قناع دائري لقص الصورة
+        mask = Image.new("L", (circle_size, circle_size), 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse((0, 0, circle_size, circle_size), fill=255)
+
+        # لصق الأفتار الدائري فوق الخلفية
+        bg.paste(avatar, circle_coords, mask)
+
+        # حفظ النتيجة في ذاكرة مؤقتة
+        output = BytesIO()
+        bg.save(output, format="PNG")
+        output.seek(0)
+        return discord.File(output, filename="card.png")
+    except Exception as e:
+        print(f"❌ خطأ في معالجة بطاقة الترحيب/المغادرة: {e}")
+        return None
+
+class WelcomeGoodbye(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def create_card(self, member: discord.Member, card_type="welcome"):
-        # 1. إنشاء خلفية البطاقة (أبعاد 800×400)
-        card = Image.new("RGBA", (800, 400), (20, 20, 25, 255))
-        draw = ImageDraw.Draw(card)
-
-        # محاولة جلب الصورة الخلفية باستخدام aiohttp
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(BACKGROUND_IMAGE_URL) as resp:
-                    if resp.status == 200:
-                        bg_bytes = await resp.read()
-                        bg = Image.open(io.BytesIO(bg_bytes)).convert("RGBA")
-                        bg = bg.resize((800, 400))
-                        card.paste(bg, (0, 0))
-        except Exception:
-            pass
-
-        # طبقة تعتيم خفيفة لإبراز النصوص
-        overlay = Image.new("RGBA", (800, 400), (0, 0, 0, 160))
-        card = Image.alpha_composite(card, overlay)
-        draw = ImageDraw.Draw(card)
-
-        # 2. جلب صورة البروفايل وقصها بشكل دائري
-        avatar_asset = member.avatar or member.default_avatar
-        avatar_bytes = await avatar_asset.read()
-        avatar = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-        avatar = avatar.resize((150, 150))
-
-        mask = Image.new("L", (150, 150), 0)
-        mask_draw = ImageDraw.Draw(mask)
-        mask_draw.ellipse((0, 0, 150, 150), fill=255)
-        
-        avatar_masked = ImageOps.fit(avatar, mask.size, centering=(0.5, 0.5))
-        avatar_masked.putalpha(mask)
-        card.paste(avatar_masked, (325, 45), avatar_masked)
-
-        # 3. إعداد الخطوط والنصوص
-        try:
-            font_large = ImageFont.truetype("arial.ttf", 34)
-            font_small = ImageFont.truetype("arial.ttf", 24)
-        except IOError:
-            font_large = ImageFont.load_default()
-            font_small = ImageFont.load_default()
-
-        # تحديد النص بحسب الحالة (دخول أو خروج)
-        if card_type == "welcome":
-            main_text = "أهلاً بك في السيرفر!"
-            text_color = (255, 255, 255, 255)
-        else:
-            main_text = "لقد غادر السيرفر"
-            text_color = (255, 100, 100, 255)
-
-        reshaped_text = arabic_reshaper.reshape(main_text)
-        bidi_text = get_display(reshaped_text)
-        member_name = f"{member.name}"
-
-        # رسم النصوص في البطاقة
-        draw.text((400, 235), bidi_text, font=font_large, fill=text_color, anchor="mm")
-        draw.text((400, 285), member_name, font=font_small, fill=(200, 170, 255, 255), anchor="mm")
-
-        # حفظ البطاقة في الذاكرة
-        final_buffer = io.BytesIO()
-        card.save(final_buffer, format="PNG")
-        final_buffer.seek(0)
-        return final_buffer
-
-    # --- حدث دخول العضو ---
+    # --- حدث انضمام عضو جديد (الترحيب) ---
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
         channel = member.guild.get_channel(WELCOME_CHANNEL_ID)
-        if not channel:
-            return
+        if not channel: return
 
-        card_file = await self.create_card(member, card_type="welcome")
-        file = discord.File(card_file, filename="welcome-card.png")
+        card_file = await create_custom_card(member, WELCOME_IMAGE_URL)
+        if card_file:
+            await channel.send(content=f"مرحبًا بك {member.mention}!", file=card_file)
+        else:
+            await channel.send(f"مرحبًا بك {member.mention}!")
 
-        embed = discord.Embed(
-            title="🎉 عضو جديد انضم إلينا!",
-            description=f"مرحباً بك {member.mention} في سيرفر **VOID**.\n\n"
-                        f"📌 **يرجى قراءة القوانين جيداً لضمان عدم مخالفتها.**",
-            color=discord.Color.dark_purple()
-        )
-        embed.set_image(url="attachment://welcome-card.png")
-        embed.set_footer(text=f"عدد الأعضاء: {len(member.guild.members)}")
-
-        await channel.send(embed=embed, file=file)
-
-    # --- حدث خروج العضو ---
+    # --- حدث مغادرة عضو (وداعاً) ---
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        channel = member.guild.get_channel(LEAVE_CHANNEL_ID)
-        if not channel:
-            return
+        channel = member.guild.get_channel(GOODBYE_CHANNEL_ID)
+        if not channel: return
 
-        card_file = await self.create_card(member, card_type="leave")
-        file = discord.File(card_file, filename="leave-card.png")
-
-        embed = discord.Embed(
-            title="👋 غادر أحد الأعضاء",
-            description=f"وداعاً **{member.name}**، نتمنى لك التوفيق!",
-            color=discord.Color.red()
-        )
-        embed.set_image(url="attachment://leave-card.png")
-
-        await channel.send(embed=embed, file=file)
+        card_file = await create_custom_card(member, GOODBYE_IMAGE_URL)
+        if card_file:
+            await channel.send(file=card_file)
+        else:
+            await channel.send(f"نشكر لك وجودك معنا **{member.name}**، نتمنى لك التوفيق.")
 
 async def setup(bot):
-    await bot.add_cog(WelcomeLeave(bot))
+    await bot.add_cog(WelcomeGoodbye(bot))
