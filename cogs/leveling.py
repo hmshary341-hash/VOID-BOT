@@ -25,23 +25,22 @@ REQUEST_COOLDOWN = 1.0  # تأخير بين الطلبات (بالثواني) ل
 # --- رسالة التشجيع عند الترقية ---
 LEVEL_UP_ENCOURAGEMENT = "كفو على التفاعل كمل تفاعلك يا فله"
 
-# --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
+# --- إعدادات رتب الألفل (تحديث شامل) ---
 LEVEL_ROLES = {
-    5: "Bronze",
-    10: "Silver",
-    15: "Gold",
-    20: "Platinum",
-    25: "Emerald",
-    30: "Sapphire",
-    35: "Ruby",
-    40: "Diamond",
-    45: "Crystal",
-    50: "Master",
-    55: "Elite",
-    60: "Champion",
-    70: "Legend",
-    85: "Mythic",
-    100: "Eternal",
+    1: "Bronze",
+    5: "Silver",
+    10: "Gold",
+    15: "Platinum",
+    20: "Emerald",
+    25: "Sapphire",
+    30: "Diamond",
+    35: "Crystal",
+    40: "Master",
+    45: "Elite",
+    50: "Champion",
+    60: "Legend",
+    70: "Mythic",
+    80: "Eternal",
 }
 
 # --- رابط بطاقة الرانك الدائم ---
@@ -292,6 +291,65 @@ async def generate_card(member, xp, level, role_name="Member"):
     return None
 
 
+def get_role_for_level(level: int) -> str:
+  """الحصول على اسم الرتبة المناسبة للمستوى"""
+  for lvl in sorted(LEVEL_ROLES.keys(), reverse=True):
+    if level >= lvl:
+      return LEVEL_ROLES[lvl]
+  return "Member"
+
+
+async def assign_level_roles(member: discord.Member, level: int):
+  """تعيين أو إزالة رتب المستويات بناءً على مستوى العضو
+  
+  Args:
+    member: عضو الخادم
+    level: المستوى الحالي للعضو
+  """
+  try:
+    current_role_name = get_role_for_level(level)
+    
+    # العثور على الرتبة الجديدة في الخادم
+    new_role = None
+    for r in member.guild.roles:
+      if current_role_name.lower() in r.name.lower():
+        new_role = r
+        break
+    
+    if not new_role:
+      print(f"⚠️ لم يتم العثور على رتبة '{current_role_name}' في الخادم")
+      return
+    
+    # جمع جميع رتب المستويات الحالية للعضو
+    roles_to_remove = []
+    all_level_role_keywords = [role_name.lower() for role_name in LEVEL_ROLES.values()]
+    
+    for role in member.roles:
+      if any(keyword in role.name.lower() for keyword in all_level_role_keywords):
+        if role.id != new_role.id:
+          roles_to_remove.append(role)
+    
+    # إزالة الرتب القديمة
+    if roles_to_remove:
+      try:
+        await member.remove_roles(*roles_to_remove)
+        removed_names = ", ".join([r.name for r in roles_to_remove])
+        print(f"✅ تم إزالة الرتب: {removed_names} من {member.name}")
+      except Exception as e:
+        print(f"❌ خطأ في إزالة الرتب: {e}")
+    
+    # إضافة الرتبة الجديدة
+    if new_role not in member.roles:
+      try:
+        await member.add_roles(new_role)
+        print(f"✅ تم إضافة رتبة '{new_role.name}' لـ {member.name}")
+      except Exception as e:
+        print(f"❌ خطأ في إضافة الرتبة: {e}")
+  except Exception as e:
+    print(f"❌ خطأ عام في تعيين رتب المستويات: {e}")
+    traceback.print_exc()
+
+
 class Leveling(commands.Cog):
 
   def __init__(self, bot):
@@ -342,11 +400,7 @@ class Leveling(commands.Cog):
         level += 1
         xp -= next_level_xp
 
-        current_role_name = "Member"
-        for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
-          if level >= lvl:
-            current_role_name = r_name
-            break
+        current_role_name = get_role_for_level(level)
 
         target_channel = message.guild.get_channel(LEVEL_UP_CHANNEL_ID)
         if target_channel:
@@ -360,34 +414,13 @@ class Leveling(commands.Cog):
               )
             else:
               await target_channel.send(
-                  f"🎉 مبروك {message.author.mention}! لقد صعدت للمستوى **{level}**!\n{LEVEL_UP_ENCOURAGEMENT}"
+                  f"🎉 مبروك {message.author.mention}! لقد صعدت للمستوى **{level}**!\\n{LEVEL_UP_ENCOURAGEMENT}"
               )
           except Exception as e:
             print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
 
-        if level in LEVEL_ROLES:
-          keyword = LEVEL_ROLES[level].lower()
-          new_role = None
-          for r in message.guild.roles:
-            if keyword in r.name.lower():
-              new_role = r
-              break
-
-          if new_role:
-            try:
-              roles_to_remove = []
-              all_keywords = [kw.lower() for kw in LEVEL_ROLES.values()]
-              for r in message.author.roles:
-                if any(kw in r.name.lower() for kw in all_keywords):
-                  if r.id != new_role.id:
-                    roles_to_remove.append(r)
-
-              if roles_to_remove:
-                await message.author.remove_roles(*roles_to_remove)
-
-              await message.author.add_roles(new_role)
-            except Exception as e:
-              print(f"❌ خطأ في تحديث رتب التلفل: {e}")
+        # تعيين الرتب بناءً على المستوى الجديد
+        await assign_level_roles(message.author, level)
 
       self.cursor.execute(
           "UPDATE users SET xp = ?, level = ? WHERE user_id = ? AND guild_id = ?",
@@ -413,11 +446,7 @@ class Leveling(commands.Cog):
     else:
       xp, level = result
 
-    current_role_name = "Member"
-    for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
-      if level >= lvl:
-        current_role_name = r_name
-        break
+    current_role_name = get_role_for_level(level)
 
     card_file = await generate_card(target, xp, level, current_role_name)
     if card_file:
