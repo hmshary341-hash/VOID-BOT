@@ -11,8 +11,8 @@ CATEGORY_ID = 1530047675028865175         # آي دي فئة التذاكر
 TICKET_CHANNEL_ID = 1530048038666506290   # آي دي روم التكت الأساسي
 LOG_CHANNEL_ID = 1527750890952462408      # آي دي روم اللوجز
 
-# 📌 استبدل الرابط أدناه برابط الصورة الجديدة الخاصة بك لتغطي المربع بالكامل
-IMAGE_URL = "ضع_رابط_الصورة_هنا"
+# 📌 رابط الصورة الجديد الخاص بك
+IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530292406782787787/file_00000000cac881f49d4ac09da2958858.png?ex=6a650b5d&is=6a63b9dd&hm=1fffbebe862f59047c970c674f003a190b657a29618b8027f5bff0ebe3ea7baa&"
 
 # --- أسماء الرتب الإدارية والدعم الفني (بدون رتب الإيفنت) ---
 SUPPORT_ROLE_NAMES = [
@@ -106,7 +106,7 @@ class ReportModal(discord.ui.Modal, title='نموذج الشكوى'):
         embed.add_field(name="المبلغ عنه", value=self.target.value, inline=False)
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         embed.add_field(name="🖼️ الدليل", value=self.proof.value, inline=False)
-        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+        if IMAGE_URL:
             embed.set_image(url=IMAGE_URL)
         
         support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
@@ -140,7 +140,7 @@ class VerificationModal(discord.ui.Modal, title='نموذج توثيق البن�
         embed.add_field(name="🖼️ الدليل المقدم", value=self.proof.value, inline=False)
         if self.notes.value:
             embed.add_field(name="📝 ملاحظات", value=self.notes.value, inline=False)
-        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+        if IMAGE_URL:
             embed.set_image(url=IMAGE_URL)
         
         support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
@@ -183,7 +183,7 @@ class TicketSelect(discord.ui.Select):
             
             embed = discord.Embed(title=f"تذكرة إستفسار | #{ticket_num}", description="يرجى كتابة استفسارك هنا وسيقوم الدعم الفني بالرد عليك قريباً.", color=discord.Color.blue())
             embed.add_field(name="👤 صاحب الاستفسار", value=interaction.user.mention, inline=False)
-            if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+            if IMAGE_URL:
                 embed.set_image(url=IMAGE_URL)
             
             support_role = discord.utils.get(interaction.guild.roles, name="Support Staff")
@@ -212,7 +212,7 @@ class Tickets(commands.Cog):
             description="اختر نوع التذكرة المناسبة من الخيارات أدناه.\n\n> ⚠️ **ملاحظات مهمة:**\n> • يرجى اختيار القسم المناسب لمشكلتك.\n> • التذاكر غير المناسبة يتم إغلاقها دون مراجعة.\n> • سيتم الرد عليك في أقرب وقت ممكن.", 
             color=discord.Color.dark_gold()
         )
-        if IMAGE_URL and IMAGE_URL != "ضع_رابط_الصورة_هنا":
+        if IMAGE_URL:
             embed.set_image(url=IMAGE_URL)
             
         await interaction.response.send_message(embed=embed, view=OpenTicketView())
