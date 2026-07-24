@@ -3,23 +3,33 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# --- الإعدادات ---
-PRISON_ROLE_ID = 1526011928433135810  # آي دي رتبة السجن
-ADMIN_ROLE_ID = 1527513659704606740   # رتبة الإدارة المحددة
+# --- الإعدادات (أسماء الرتب المسموح لها حصرياً دون إداريي الإيفنت) ---
+ALLOWED_ROLES = [
+    "Owner",
+    "Co-Owner",
+    "Support Manager",
+    "Senior Support",
+    "Support Staff"
+]
 
-# --- آي دي رتب التحذيرات ---
-WARN_ROLE_1_ID = 1529362841696735353
-WARN_ROLE_2_ID = 1529362930997661807
-WARN_ROLE_3_ID = 1529363013382176830
+# --- أسماء رتب السجن والتحذيرات ---
+PRISON_ROLE_NAME = "Prison"      # اسم رتبة السجن
+
+WARN_ROLE_1_NAME = "تحذير 1"
+WARN_ROLE_2_NAME = "تحذير 2"
+WARN_ROLE_3_NAME = "تحذير 3"
 
 # --- دالة التحقق من الصلاحية ---
 def admin_only():
     async def predicate(interaction: discord.Interaction):
         if interaction.user.guild_permissions.administrator:
             return True
-        if any(role.id == ADMIN_ROLE_ID for role in interaction.user.roles):
+        
+        user_role_names = [role.name for role in interaction.user.roles]
+        if any(role_name in user_role_names for role_name in ALLOWED_ROLES):
             return True
-        await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص للمشرفين فقط.", ephemeral=True)
+            
+        await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص للإدارة العليا وطاقم الدعم (Support) فقط.", ephemeral=True)
         return False
     return app_commands.check(predicate)
 
@@ -33,12 +43,12 @@ class Admin(commands.Cog):
     async def warn(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
         
-        r1 = interaction.guild.get_role(WARN_ROLE_1_ID)
-        r2 = interaction.guild.get_role(WARN_ROLE_2_ID)
-        r3 = interaction.guild.get_role(WARN_ROLE_3_ID)
+        r1 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_1_NAME)
+        r2 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_2_NAME)
+        r3 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_3_NAME)
 
         if not r1 or not r2 or not r3:
-            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة آي دي رتب التحذيرات في السيرفر.", ephemeral=True)
+            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة أسماء رتب التحذيرات في السيرفر.", ephemeral=True)
 
         try:
             if r3 in member.roles:
@@ -72,12 +82,12 @@ class Admin(commands.Cog):
     async def unwarn(self, interaction: discord.Interaction, member: discord.Member, reason: str = "لا يوجد"):
         await interaction.response.defer(ephemeral=True)
         
-        r1 = interaction.guild.get_role(WARN_ROLE_1_ID)
-        r2 = interaction.guild.get_role(WARN_ROLE_2_ID)
-        r3 = interaction.guild.get_role(WARN_ROLE_3_ID)
+        r1 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_1_NAME)
+        r2 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_2_NAME)
+        r3 = discord.utils.get(interaction.guild.roles, name=WARN_ROLE_3_NAME)
 
         if not r1 or not r2 or not r3:
-            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة آي دي رتب التحذيرات في السيرفر.", ephemeral=True)
+            return await interaction.followup.send("❌ حدث خطأ: تأكد من صحة أسماء رتب التحذيرات في السيرفر.", ephemeral=True)
 
         try:
             if r3 in member.roles:
@@ -104,7 +114,7 @@ class Admin(commands.Cog):
         except Exception:
             await interaction.followup.send("❌ حدث خطأ، تأكد أن رتبة البوت أعلى من رتب التحذيرات والرتبة المستهدفة.", ephemeral=True)
 
-    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت (مصحح تماماً) ---
+    # --- أمر كشف المسؤول عن العقوبات والتحذيرات والتايم أوت ---
     @app_commands.command(name="modhistory", description="فحص سجلات العضو لمعرفة من أعطاه تحذير أو تايم أوت أو عقوبة")
     @admin_only()
     async def modhistory(self, interaction: discord.Interaction, member: discord.Member):
@@ -133,11 +143,12 @@ class Admin(commands.Cog):
                             actions_found += 1
                     elif entry.action == discord.AuditLogAction.member_role_update:
                         if entry.after and getattr(entry.after, 'roles', None):
-                            role_ids = [r.id for r in entry.after.roles]
-                            for r_id in [WARN_ROLE_1_ID, WARN_ROLE_2_ID, WARN_ROLE_3_ID, PRISON_ROLE_ID]:
-                                if r_id in role_ids:
-                                    r_name = "تحذير 1" if r_id == WARN_ROLE_1_ID else ("تحذير 2" if r_id == WARN_ROLE_2_ID else ("تحذير 3" if r_id == WARN_ROLE_3_ID else "سجن"))
-                                    embed.add_field(name=f"⚠️ رتبة إدارية ({r_name})", value=f"المسؤول: {entry.user.mention}", inline=False)
+                            role_names = [r.name for r in entry.after.roles]
+                            target_names = [WARN_ROLE_1_NAME, WARN_ROLE_2_NAME, WARN_ROLE_3_NAME, PRISON_ROLE_NAME]
+                            for r_name in target_names:
+                                if r_name in role_names:
+                                    display_name = "تحذير 1" if r_name == WARN_ROLE_1_NAME else ("تحذير 2" if r_name == WARN_ROLE_2_NAME else ("تحذير 3" if r_name == WARN_ROLE_3_NAME else "سجن"))
+                                    embed.add_field(name=f"⚠️ رتبة إدارية ({display_name})", value=f"المسؤول: {entry.user.mention}", inline=False)
                                     actions_found += 1
                                     break
                                         
@@ -229,9 +240,9 @@ class Admin(commands.Cog):
     @admin_only()
     async def prison(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.defer(ephemeral=True)
-        role = interaction.guild.get_role(PRISON_ROLE_ID)
+        role = discord.utils.get(interaction.guild.roles, name=PRISON_ROLE_NAME)
         if not role:
-            return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من آي دي الرتبة في الكود.", ephemeral=True)
+            return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من مطابقة اسم الرتبة في الكود.", ephemeral=True)
         try:
             await member.add_roles(role)
             await interaction.followup.send(f"⛓️ تم سجن {member.mention} بنجاح.", ephemeral=True)
@@ -242,9 +253,9 @@ class Admin(commands.Cog):
     @admin_only()
     async def unprison(self, interaction: discord.Interaction, member: discord.Member):
         await interaction.response.defer(ephemeral=True)
-        role = interaction.guild.get_role(PRISON_ROLE_ID)
+        role = discord.utils.get(interaction.guild.roles, name=PRISON_ROLE_NAME)
         if not role:
-            return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من آي دي الرتبة في الكود.", ephemeral=True)
+            return await interaction.followup.send("❌ رتبة السجن غير موجودة، تأكد من مطابقة اسم الرتبة في الكود.", ephemeral=True)
         try:
             await member.remove_roles(role)
             await interaction.followup.send(f"🔓 تم الإفراج عن {member.mention} بنجاح.", ephemeral=True)
