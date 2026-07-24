@@ -1,25 +1,27 @@
 import discord
 from discord.ext import commands
 
-class AutoDivider(commands.Cog):
+class Separators(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.target_channels = [1526823698089119784, 1526227386117656586]
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        # منع البوت من الرد على نفسه
+        # تجاهل رسائل البوتات لتجنب التكرار
         if message.author.bot:
             return
 
-        # التأكد أن الرسالة في أحد الرومات المحددة
-        if message.channel.id in self.target_channels:
-            # فاصل نصي طويل وأنيق يمتد بعرض الشات
-            divider = "💜 ─── ⋆⋅『 **𝖵 𝖮 𝖨 𝖣** 』⋅⋆ ─── 💜"
-            try:
-                await message.channel.send(divider)
-            except Exception as e:
-                print(f"خطأ في إرسال الفاصل: {e}")
+        # 1. روم الشعر
+        if message.channel.id == 1530050492938584124:
+            await message.reply("صح لسانك يا الشاعر/ه 🤍")
+
+        # 2. روم التكليجات
+        elif message.channel.id == 1530051019608690708:
+            await message.reply("ههههههههه يا وحش قفطت التكليجه")
+
+        # 3. روم الإبداعات
+        elif message.channel.id == 1530051188698120233:
+            await message.reply("اي والله إبداع انت/ي بعيونا مبدع/ه")
 
 async def setup(bot):
-    await bot.add_cog(AutoDivider(bot))
+    await bot.add_cog(Separators(bot))
