@@ -26,7 +26,7 @@ class ReviewModal(discord.ui.Modal):
         embed.add_field(name="📝 الملاحظات:", value=str(self.feedback), inline=False)
         
         await log_channel.send(embed=embed)
-        await interaction.response.send_message("✅ تم إرسال تقييمك للإدارة العليا بنجاح وبسرية تامة.", ephemeral=True)
+        await interaction.response.send_message("✅ تم إرسال تقييمك للإدارة العليا بنجاح .", ephemeral=True)
 
 class ReviewLaunchView(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
