@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 import random
 import sqlite3
+import traceback
 from PIL import Image, ImageDraw, ImageFont
 
 # --- الإعدادات الأساسية ---
@@ -41,6 +42,7 @@ async def generate_card(member, xp, level, role_name="Member"):
       # تحميل الخلفية
       async with session.get(CARD_BG_URL) as resp:
         if resp.status != 200:
+          print(f"❌ فشل تحميل خلفية البطاقة، كود الاستجابة: {resp.status}")
           return None
         bg_data = await resp.read()
 
@@ -48,6 +50,7 @@ async def generate_card(member, xp, level, role_name="Member"):
       avatar_url = member.display_avatar.with_format("png").url
       async with session.get(avatar_url) as resp:
         if resp.status != 200:
+          print(f"❌ فشل تحميل أفتار العضو، كود الاستجابة: {resp.status}")
           return None
         avatar_data = await resp.read()
 
@@ -96,7 +99,8 @@ async def generate_card(member, xp, level, role_name="Member"):
     output.seek(0)
     return discord.File(output, filename="card.png")
   except Exception as e:
-    print(f"❌ خطأ في إنشاء البطاقة: {e}")
+    print(f"❌ خطأ تفصيلي في إنشاء البطاقة:")
+    traceback.print_exc()
     return None
 
 
