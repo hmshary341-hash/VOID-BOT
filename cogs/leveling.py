@@ -224,14 +224,14 @@ class Leveling(commands.Cog):
         current_role_name = r_name
         break
 
-    card_file = await generate_card(target, xp, level, current_role_name)
-    if card_file:
-      await interaction.followup.send(file=card_file, ephemeral=True)
-    else:
-      await interaction.followup.send(
-          f"❌ حدث خطأ أثناء إنشاء بطاقة الرانك لـ {target.mention}.",
-          ephemeral=True,
-      )
+      card_file = await generate_card(target, xp, level, current_role_name)
+      if card_file:
+        await interaction.followup.send(file=card_file, ephemeral=True)
+      else:
+        await interaction.followup.send(
+            f"❌ حدث خطأ أثناء إنشاء بطاقة الرانك لـ {target.mention}.",
+            ephemeral=True,
+        )
 
   @app_commands.command(
       name="reset_levels",
@@ -244,10 +244,12 @@ class Leveling(commands.Cog):
       )
       return
 
+    # تنفيذ التصفير الحقيقي بحذف الجدول أو تفريغه للسيرفر الحالي
     self.cursor.execute(
         "DELETE FROM users WHERE guild_id = ?", (interaction.guild.id,)
     )
     self.conn.commit()
+
     await interaction.response.send_message(
         "🔄 | تم تصفير جميع المستويات والنقاط في السيرفر بنجاح!", ephemeral=True
     )
