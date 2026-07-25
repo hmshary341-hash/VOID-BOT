@@ -25,23 +25,22 @@ REQUEST_COOLDOWN = 1.0  # تأخير بين الطلبات (بالثواني) ل
 # --- رسالة التشجيع عند الترقية ---
 LEVEL_UP_ENCOURAGEMENT = "كفو على التفاعل كمل تفاعلك يا فله"
 
-# --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية) ---
+# --- إعدادات رتب الألفل (بالكلمات المفتاحية الأساسية بناءً على طلبك) ---
 LEVEL_ROLES = {
-    5: "Bronze",
-    10: "Silver",
-    15: "Gold",
-    20: "Platinum",
-    25: "Emerald",
-    30: "Sapphire",
-    35: "Ruby",
-    40: "Diamond",
-    45: "Crystal",
-    50: "Master",
-    55: "Elite",
-    60: "Champion",
-    70: "Legend",
-    85: "Mythic",
-    100: "Eternal",
+    1: "Bronze",
+    5: "Silver",
+    10: "Gold",
+    15: "Platinum",
+    20: "Emerald",
+    25: "Sapphire",
+    30: "Diamond",
+    35: "Crystal",
+    40: "Master",
+    45: "Elite",
+    50: "Champion",
+    60: "Legend",
+    70: "Mythic",
+    80: "Eternal",
 }
 
 # --- رابط بطاقة الرانك الدائم ---
@@ -164,22 +163,12 @@ image_cache = ImageCache(CACHE_DIR)
 
 
 def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: int):
-  """رسم شريط التقدم على البطاقة
-  
-  Args:
-    draw: كائن ImageDraw لرسم العناصر
-    current_xp: نقاط الخبرة الحالية
-    required_xp: نقاط الخبرة المطلوبة للمستوى التالي
-  """
+  """رسم شريط التقدم على البطاقة"""
   try:
-    # التأكد من أن القيم صحيحة
     current_xp = max(0, min(current_xp, required_xp))
-    
-    # حساب نسبة التقدم
     progress_ratio = current_xp / required_xp if required_xp > 0 else 0
     filled_width = int(PROGRESS_BAR_WIDTH * progress_ratio)
     
-    # رسم الخلفية (الجزء الفارغ)
     draw.rectangle(
       [(PROGRESS_BAR_X, PROGRESS_BAR_Y), 
        (PROGRESS_BAR_X + PROGRESS_BAR_WIDTH, PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT)],
@@ -188,7 +177,6 @@ def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: i
       width=2
     )
     
-    # رسم الجزء الممتلئ
     if filled_width > 0:
       draw.rectangle(
         [(PROGRESS_BAR_X, PROGRESS_BAR_Y), 
@@ -196,7 +184,6 @@ def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: i
         fill=PROGRESS_BAR_COLOR
       )
     
-    # رسم نسبة مئوية في وسط الشريط
     try:
       font_percent = ImageFont.truetype("arial.ttf", 14)
     except:
@@ -205,7 +192,6 @@ def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: i
     percentage = int(progress_ratio * 100)
     percent_text = f"{percentage}%"
     
-    # حساب موضع النص في منتصف الشريط
     bbox = draw.textbbox((0, 0), percent_text, font=font_percent)
     text_width = bbox[2] - bbox[0]
     text_height = bbox[3] - bbox[1]
@@ -213,8 +199,7 @@ def draw_progress_bar(draw: ImageDraw.ImageDraw, current_xp: int, required_xp: i
     text_x = PROGRESS_BAR_X + (PROGRESS_BAR_WIDTH - text_width) // 2
     text_y = PROGRESS_BAR_Y + (PROGRESS_BAR_HEIGHT - text_height) // 2
     
-    # رسم النص بلون متناسب
-    text_color = (255, 255, 255)  # أبيض للتباين
+    text_color = (255, 255, 255)
     draw.text((text_x, text_y), percent_text, fill=text_color, font=font_percent)
     
   except Exception as e:
@@ -226,37 +211,30 @@ async def generate_card(member, xp, level, role_name="Member"):
   """وظيفة تصميم البطاقة ووضع صورة العضو داخل الإطار الدائري بدقة"""
   try:
     async with aiohttp.ClientSession() as session:
-      # تحميل الخلفية من الكاش (مع بديل)
       bg_data = await image_cache.get_image(CARD_BG_URL, session, allow_fallback=True)
       if not bg_data:
         print(f"❌ فشل الحصول على خلفية البطاقة حتى مع البديل")
         return None
 
-      # تحميل صورة بروفايل العضو (بدون بديل - صورة العضو ضرورية)
       avatar_url = member.display_avatar.with_format("png").url
       avatar_data = await image_cache.get_image(avatar_url, session, allow_fallback=False)
       if not avatar_data:
         print(f"❌ فشل تحميل أفتار العضو")
         return None
 
-    # فتح الصور باستخدام Pillow
     bg = Image.open(BytesIO(bg_data)).convert("RGBA")
     avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
 
-    # حجم وإحداثيات الأفتار لتغطية الدائرة
     avatar_size = 230
     avatar = avatar.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
 
-    # إنشاء قناع دائري لقص الأفتار
     mask = Image.new("L", (avatar_size, avatar_size), 0)
     draw_mask = ImageDraw.Draw(mask)
     draw_mask.ellipse((0, 0, avatar_size, avatar_size), fill=255)
 
-    # إحداثيات مركز الدائرة في البطاقة
     avatar_coords = (115, 135)
     bg.paste(avatar, avatar_coords, mask)
 
-    # رسم النصوص والعناصر
     draw = ImageDraw.Draw(bg)
 
     try:
@@ -266,22 +244,18 @@ async def generate_card(member, xp, level, role_name="Member"):
       font_level = ImageFont.load_default()
       font_text = ImageFont.load_default()
 
-    # 1. كتابة رقم اللفل
     level_text = str(level)
     draw.text((460, 105), level_text, fill=(0, 229, 255), font=font_level)
 
-    # 2. كتابة معلومات الـ XP
     next_level_xp = (level + 1) * 100
     xp_text = f"{xp} / {next_level_xp} XP"
     draw.text((610, 245), xp_text, fill=(255, 179, 71), font=font_text)
 
-    # 3. رسم شريط التقدم
     draw_progress_bar(draw, xp, next_level_xp)
 
-    # 4. كتابة اسم الرتبة
-    draw.text((580, 370), f"CYBERNETIC", fill=(216, 180, 255), font=font_text)
+    # كتابة اسم الرتبة الحالية للعضو على البطاقة
+    draw.text((580, 370), role_name.upper(), fill=(216, 180, 255), font=font_text)
 
-    # حفظ الصورة في ذاكرة مؤقتة للإرسال
     output = BytesIO()
     bg.save(output, format="PNG")
     output.seek(0)
@@ -365,6 +339,7 @@ class Leveling(commands.Cog):
           except Exception as e:
             print(f"❌ خطأ في إرسال بطاقة التلفل: {e}")
 
+        # منطق إعطاء الرتبة الجديدة وحذف الرتب القديمة تلقائياً
         if level in LEVEL_ROLES:
           keyword = LEVEL_ROLES[level].lower()
           new_role = None
@@ -473,4 +448,3 @@ class Leveling(commands.Cog):
 
 async def setup(bot):
   await bot.add_cog(Leveling(bot))
-
