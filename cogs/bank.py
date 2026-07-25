@@ -8,6 +8,9 @@ import datetime
 
 DATA_FILE = "economy.json"
 
+# تم ضبط الآي دي الخاص بك هنا
+OWNER_ID = 1529995977203777566
+
 def load_data():
     if not os.path.exists(DATA_FILE):
         return {}
@@ -21,10 +24,34 @@ def save_data(data):
 def get_user_data(data, user_id):
     user_id = str(user_id)
     if user_id not in data:
-        data[user_id] = {"coins": 0, "daily_transferred": 0, "last_date": ""}
+        data[user_id] = {
+            "coins": 0, 
+            "daily_transferred": 0, 
+            "last_date": "", 
+            "last_daily_date": "", 
+            "last_work_date": "",
+            "nerd_count": 0,
+            "last_nerd_date": ""
+        }
     elif isinstance(data[user_id], int):
         old_coins = data[user_id]
-        data[user_id] = {"coins": old_coins, "daily_transferred": 0, "last_date": ""}
+        data[user_id] = {
+            "coins": old_coins, 
+            "daily_transferred": 0, 
+            "last_date": "", 
+            "last_daily_date": "", 
+            "last_work_date": "",
+            "nerd_count": 0,
+            "last_nerd_date": ""
+        }
+    else:
+        user_data = data[user_id]
+        if "daily_transferred" not in user_data: user_data["daily_transferred"] = 0
+        if "last_date" not in user_data: user_data["last_date"] = ""
+        if "last_daily_date" not in user_data: user_data["last_daily_date"] = ""
+        if "last_work_date" not in user_data: user_data["last_work_date"] = ""
+        if "nerd_count" not in user_data: user_data["nerd_count"] = 0
+        if "last_nerd_date" not in user_data: user_data["last_nerd_date"] = ""
     return data[user_id]
 
 class Bank(commands.Cog):
@@ -38,29 +65,41 @@ class Bank(commands.Cog):
         coins = user_data["coins"]
         await interaction.response.send_message(f"🏦 رصيدك في البنك هو: **{coins:,} كوينز**", ephemeral=True)
 
-    @app_commands.command(name="daily", description="الحصول على جائزتك اليومية من الكوينز (1000 كوينز)")
+    @app_commands.command(name="daily", description="الحصول على جائزتك اليومية من الكوينز (مرة كل يوم)")
     async def daily(self, interaction: discord.Interaction):
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
+        today_str = str(datetime.date.today())
+        if user_data.get("last_daily_date") == today_str:
+            await interaction.response.send_message("❌ لقد استلمت جائزتك اليومية بالفعل اليوم! يمكنك استلامها مرة أخرى غداً.", ephemeral=True)
+            return
+
         reward = 1000
         user_data["coins"] += reward
+        user_data["last_daily_date"] = today_str
         save_data(data)
 
         await interaction.response.send_message(f"🎉 لقد استلمت جائزتك اليومية بنجاح! تم إضافة **{reward:,} كوينز** إلى رصيدك البنكي.", ephemeral=True)
 
-    @app_commands.command(name="work", description="العمل لكسب بعض الكوينز في البنك (بين 2000 و 4000)")
+    @app_commands.command(name="work", description="العمل لكسب بعض الكوينز في البنك (مرة كل يوم)")
     async def work(self, interaction: discord.Interaction):
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
+        today_str = str(datetime.date.today())
+        if user_data.get("last_work_date") == today_str:
+            await interaction.response.send_message("❌ لقد قمت بالعمل بالفعل اليوم! يمكنك العمل مرة أخرى غداً.", ephemeral=True)
+            return
+
         earned = random.randint(2000, 4000)
         user_data["coins"] += earned
+        user_data["last_work_date"] = today_str
         save_data(data)
 
         await interaction.response.send_message(f"🛠️ عملت بجد وربحت **{earned:,} كوينز** أضيفت لحسابك البنكي!", ephemeral=True)
 
-    @app_commands.command(name="coinflip", description="لعبة مراهنة البنك: ضعفك أو تخسر كوينزك")
+    @app_commands.command(name="coinflip", description="لعبة مراهنة البنك: لا محدودة (الخاسر تحول فلوسه لحساب البنك الخاص بك)")
     @app_commands.describe(amount="عدد الكوينز التي تريد المراهنة بها")
     async def coinflip(self, interaction: discord.Interaction, amount: int):
         data = load_data()
@@ -81,29 +120,50 @@ class Bank(commands.Cog):
             await interaction.response.send_message(f"🎉 مبروك! فزت بالرهان وضاعفت مبلغك. ربحت **{amount:,} كوينز**! رصيدك الجديد: **{user_data['coins']:,} كوينز**")
         else:
             user_data["coins"] -= amount
+            
+            # تحويل المبلغ الخاسر إلى حسابك البنكي الخاص
+            if interaction.user.id != OWNER_ID:
+                owner_data = get_user_data(data, OWNER_ID)
+                owner_data["coins"] += amount
+
             save_data(data)
             await interaction.response.send_message(f"😢 للأسف خسرت الرهان وخسرت **{amount:,} كوينز**. رصيدك الجديد: **{user_data['coins']:,} كوينز**")
 
-    @app_commands.command(name="نرد", description="لعبة نرد البنك: مكافآت (3000، 2000، 1000 أو صفر)")
+    @app_commands.command(name="نرد", description="لعبة نرد البنك: مكافآت عشوائية (متاحة مرتين فقط في اليوم)")
     async def nerd(self, interaction: discord.Interaction):
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
+        today_str = str(datetime.date.today())
+        if user_data.get("last_nerd_date") != today_str:
+            user_data["last_nerd_date"] = today_str
+            user_data["nerd_count"] = 0
+
+        MAX_NERD_LIMIT = 2
+        if user_data["nerd_count"] >= MAX_NERD_LIMIT:
+            await interaction.response.send_message("❌ لقد استهلكت محاولاتك لـ (النرد) لهذا اليوم (مرتان فقط). تجدد المحاولات غداً!", ephemeral=True)
+            return
+
+        user_data["nerd_count"] += 1
+
         rewards = [3000, 1000, 2000, 0, 0, 0]
         reward = random.choice(rewards)
         
         user_data["coins"] += reward
         save_data(data)
         
+        remaining_attempts = MAX_NERD_LIMIT - user_data["nerd_count"]
         if reward > 0:
             await interaction.response.send_message(
                 f"🎲 رميت النرد وحالفك الحظ! ربحت **{reward:,} كوينز**.\n"
-                f"🏦 رصيدك الجديد: **{user_data['coins']:,} كوينز**"
+                f"🏦 رصيدك الجديد: **{user_data['coins']:,} كوينز**\n"
+                f"📌 المحاولات المتبقية لك اليوم: {remaining_attempts}"
             )
         else:
             await interaction.response.send_message(
                 f"🎲 رميت النرد وللأسف جاء الحظ صفيراً (0 كوينز).\n"
-                f"🏦 رصيدك الحالي: **{user_data['coins']:,} كوينز**"
+                f"🏦 رصيدك الحالي: **{user_data['coins']:,} كوينز**\n"
+                f"📌 المحاولات المتبقية لك اليوم: {remaining_attempts}"
             )
 
     @app_commands.command(name="transfer", description="تحويل كوينز لعضو آخر (الحد اليومي 2,000 كوينز)")
