@@ -9,8 +9,9 @@ import datetime
 os.makedirs("/app/data", exist_ok=True)
 DATA_FILE = "/app/data/economy.json"
 
-# **ضع الآي دي (ID) الخاص بك هنا** ليكون هذا الأمر مخصصاً لك وحدك
-OWNER_ID = 123456789012345678  # استبدل هذا الرقم بالآي دي حقك في ديسكورد
+ROLE_ID = 1529995977203777566
+OWNER_ID = 123456789012345678  # استبدل هذا الرقم بالآي دي (ID) الخاص بك
+BANK_CHANNEL_ID = 1530413677222564062  # آي دي روم البنك المسموح فيه الأوامر
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -60,8 +61,19 @@ class Bank(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def check_channel(self, interaction: discord.Interaction) -> bool:
+        if interaction.channel.id != BANK_CHANNEL_ID:
+            await interaction.response.send_message(
+                f"❌ عذراً، يمكنك استخدام أوامر البنك فقط في روم <#{BANK_CHANNEL_ID}>!",
+                ephemeral=True
+            )
+            return False
+        return True
+
     @app_commands.command(name="balance", description="معرفة رصيدك البنكي الحالي")
     async def balance(self, interaction: discord.Interaction):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         coins = user_data["coins"]
@@ -69,6 +81,8 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="daily", description="الحصول على جائزتك اليومية من الكوينز (مرة كل يوم)")
     async def daily(self, interaction: discord.Interaction):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
@@ -86,6 +100,8 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="work", description="العمل لكسب بعض الكوينز في البنك (مرة كل يوم)")
     async def work(self, interaction: discord.Interaction):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
@@ -104,6 +120,8 @@ class Bank(commands.Cog):
     @app_commands.command(name="coinflip", description="لعبة مراهنة البنك: لا محدودة")
     @app_commands.describe(amount="عدد الكوينز التي تريد المراهنة بها")
     async def coinflip(self, interaction: discord.Interaction, amount: int):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         current_balance = user_data["coins"]
@@ -127,6 +145,8 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="نرد", description="لعبة نرد البنك: مكافآت عشوائية (متاحة مرتين فقط في اليوم)")
     async def nerd(self, interaction: discord.Interaction):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         user_data = get_user_data(data, interaction.user.id)
         
@@ -165,6 +185,8 @@ class Bank(commands.Cog):
     @app_commands.command(name="transfer", description="تحويل كوينز لعضو آخر (الحد اليومي 2,000 كوينز)")
     @app_commands.describe(member="العضو المراد التحويل إليه", amount="عدد الكوينز")
     async def transfer(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        if not await self.check_channel(interaction):
+            return
         if member.id == interaction.user.id:
             await interaction.response.send_message("❌ لا يمكنك تحويل الكوينز لنفسك!", ephemeral=True)
             return
@@ -213,7 +235,8 @@ class Bank(commands.Cog):
     @app_commands.command(name="add_coins", description="أمر خاص بك لإضافة كوينز لأي شخص تحديداً")
     @app_commands.describe(member="العضو المراد إعطاؤه الكوينز", amount="عدد الكوينز المراد إضافتها")
     async def add_coins(self, interaction: discord.Interaction, member: discord.Member, amount: int):
-        # التحقق مما إذا كان المستخدم هو أنت حصرياً عبر الآي دي الخاص بك
+        if not await self.check_channel(interaction):
+            return
         if interaction.user.id != OWNER_ID:
             await interaction.response.send_message("❌ هذا الأمر مخصص لك وحدك!", ephemeral=True)
             return
@@ -232,6 +255,8 @@ class Bank(commands.Cog):
 
     @app_commands.command(name="top", description="عرض قائمة أغنى الأعضاء في البنك")
     async def top(self, interaction: discord.Interaction):
+        if not await self.check_channel(interaction):
+            return
         data = load_data()
         if not data:
             await interaction.response.send_message("❌ لا توجد بيانات أعضاء مسجلة في البنك حتى الآن!", ephemeral=True)
