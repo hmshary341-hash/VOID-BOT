@@ -295,7 +295,50 @@ class Admin(commands.Cog):
       )
 
   # ==========================================
-  # 5. أوامر إخفاء وإظهار القنوات (Hide & Show)
+  # 5. أوامر قفل وفتح الشات (Lock & Unlock)
+  # ==========================================
+  @app_commands.command(
+      name="قفل", description="قفل الشات الحالي لمنع الأعضاء من الكتابة"
+  )
+  @admin_only()
+  async def lock(self, interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    channel = interaction.channel
+    try:
+      await channel.set_permissions(
+          interaction.guild.default_role,
+          send_messages=False,
+          reason=f"تم القفل بواسطة {interaction.user}",
+      )
+      await interaction.followup.send("🔒 تم قفل الشات بنجاح.", ephemeral=True)
+      await channel.send("🔒 **تم قفل هذه القناة من قبل الإدارة.**")
+    except Exception as e:
+      await interaction.followup.send(
+          f"❌ حدث خطأ أثناء قفل القناة: `{e}`", ephemeral=True
+      )
+
+  @app_commands.command(
+      name="فتح", description="فتح الشات الحالي والسماح للأعضاء بالكتابة"
+  )
+  @admin_only()
+  async def unlock(self, interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    channel = interaction.channel
+    try:
+      await channel.set_permissions(
+          interaction.guild.default_role,
+          send_messages=True,
+          reason=f"تم الفتح بواسطة {interaction.user}",
+      )
+      await interaction.followup.send("🔓 تم فتح الشات بنجاح.", ephemeral=True)
+      await channel.send("🔓 **تم فتح هذه القناة.**")
+    except Exception as e:
+      await interaction.followup.send(
+          f"❌ حدث خطأ أثناء فتح القناة: `{e}`", ephemeral=True
+      )
+
+  # ==========================================
+  # 6. أوامر إخفاء وإظهار القنوات (Hide & Show)
   # ==========================================
   @admin.command(name="hide", description="إخفاء القناة الحالية عن الأعضاء")
   @admin_only()
@@ -316,7 +359,7 @@ class Admin(commands.Cog):
     await interaction.followup.send("👁️ تم إظهار القناة.", ephemeral=True)
 
   # ==========================================
-  # 6. الأوامر الأخرى الفردية (Kick, Clear, ModHistory)
+  # 7. الأوامر الأخرى الفردية (Kick, Clear, ModHistory)
   # ==========================================
   @admin.command(name="kick", description="طرد عضو من السيرفر")
   @admin_only()
