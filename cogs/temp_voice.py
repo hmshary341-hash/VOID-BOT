@@ -26,8 +26,10 @@ class RenameModal(discord.ui.Modal, title="تغيير اسم الروم الصو
     target_name = self.new_name.value.strip()
 
     try:
-      # تعديل الاسم مباشرة
-      await channel.edit(name=target_name, reason=fتم التغيير بواسطة {interaction.user})
+      # تعديل الاسم مباشرة مع السبب
+      await channel.edit(
+          name=target_name, reason=f"تم التغيير بواسطة {interaction.user}"
+      )
       await interaction.followup.send(
           f"✅ تم تغيير اسم الروم بنجاح إلى: **{target_name}**", ephemeral=True
       )
@@ -272,7 +274,6 @@ class TempVoice(commands.Cog):
       before: discord.VoiceState,
       after: discord.VoiceState,
   ):
-    # التعرف التلقائي على روم الإنشاء (إذا كان الاسم يحتوي على "انشاء" أو يبدأ بـ "+")
     if after.channel and (
         "انشاء" in after.channel.name.lower()
         or after.channel.name.startswith("+")
@@ -281,7 +282,6 @@ class TempVoice(commands.Cog):
       guild = member.guild
       channel_name = f"🔊 | روم {member.display_name}"
 
-      # إعطاء العضو صلاحيات كاملة لإدارة الروم (تتضمن تعديل الاسم والتحكم)
       overwrites = {
           guild.default_role: discord.PermissionOverwrite(connect=True),
           member: discord.PermissionOverwrite(
@@ -302,7 +302,6 @@ class TempVoice(commands.Cog):
       except Exception as e:
         print(f"❌ خطأ في إنشاء الروم المؤقتة: {e}")
 
-    # حذف الروم تلقائياً عند خروج الجميع منها
     if before.channel and before.channel.id in self.temp_channels:
       if len(before.channel.members) == 0:
         try:
