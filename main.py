@@ -2,8 +2,9 @@ import discord
 import os
 import asyncio
 from discord.ext import commands
-# استيراد كلاسات الـ Views من ملف التكت
+# استيراد كلاسات الـ Views من مجلد cogs
 from cogs.tickets import TicketActions, OpenTicketView
+from cogs.shop import StoreView  # استيراد فيو المتجر لضمان عمل الأزرار بشكل دائم
 
 # إعداد الصلاحيات (Intents)
 intents = discord.Intents.all()
@@ -17,6 +18,7 @@ async def on_ready():
     # تسجيل الـ Views في ذاكرة البوت لتكون مستمرة (Persistent)
     bot.add_view(TicketActions())
     bot.add_view(OpenTicketView())
+    bot.add_view(StoreView())  # تسجيل فيو المتجر الجديد
     
     # مزامنة الأوامر
     await bot.tree.sync()
@@ -26,7 +28,7 @@ async def on_ready():
     print(f"✅ تم تسجيل الـ Persistent Views بنجاح!")
 
 async def load_extensions():
-    # تحميل كل الملفات الموجودة في مجلد cogs
+    # تحميل كل الملفات الموجودة في مجلد cogs تلقائياً
     if os.path.exists('./cogs'):
         for filename in os.listdir('./cogs'):
             if filename.endswith('.py'):
@@ -48,7 +50,6 @@ async def main():
 
     async with bot:
         await load_extensions()
-    
         await bot.start(TOKEN)
 
 if __name__ == '__main__':
