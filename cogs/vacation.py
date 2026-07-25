@@ -2,13 +2,16 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# --- إعدادات الآي ديَات ---
+# --- الإعدادات والآي ديَات ---
 VACATION_CHANNEL_ID = 1530060027434500146  # روم تقديم الطلبات
 ADMIN_CHANNEL_ID = 1530511919709032458     # روم استقبال الطلبات للإدارة
 ADMIN_ROLE_IDS = [                         # رتب الإدارة المخولة بالقبول والرفض
     1529995977203777566,
     1529996765825335306
 ]
+
+# 🔹 رتبة الإجازة التي تُعطى للعضو وتُسحب منه عند الإلغاء
+VACATION_ROLE_ID = 1530266150154407966
 
 class VacationModal(discord.ui.Modal, title="نموذج طلب إجازة"):
     reason = discord.ui.TextInput(
@@ -38,7 +41,7 @@ class VacationModal(discord.ui.Modal, title="نموذج طلب إجازة"):
         embed.add_field(name="⏳ مدة الإجازة", value=self.duration.value, inline=False)
         embed.add_field(name="📝 السبب", value=self.reason.value, inline=False)
         
-        view = VacationAdminView(interaction.user.id)
+        view = VacationAdminView(interaction.user.id, interaction.guild.id)
 
         if channel:
             await channel.send(embed=embed, view=view)
@@ -54,10 +57,53 @@ class VacationButtonView(discord.ui.View):
     async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(VacationModal())
 
+class CancelVacationView(discord.ui.View):
+    def __init__(self, guild_id: int):
+        super().__init__(timeout=None)
+        self.guild_id = guild_id
+
+    @discord.ui.button(label="إلغاء الإجازة 🚫", style=discord.ButtonStyle.danger, custom_id="cancel_vacation_user_btn")
+    async def cancel_vacation(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.client.get_guild(self.guild_id)
+        if not guild:
+            await interaction.response.send_message("❌ عذراً، لم يتم العثور على السيرفر!", ephemeral=True)
+            return
+
+        member = guild.get_member(interaction.user.id)
+        if not member:
+            try:
+                member = await guild.fetch_member(interaction.user.id)
+            except:
+                pass
+
+        if not member:
+            await interaction.response.send_message("❌ لم يتم العثور عليك داخل السيرفر!", ephemeral=True)
+            return
+
+        role = guild.get_role(VACATION_ROLE_ID)
+        if not role:
+            await interaction.response.send_message("❌ رتبة الإجازة غير موجودة في السيرفر حالياً، تواصل مع الإدارة.", ephemeral=True)
+            return
+
+        if role not in member.roles:
+            await interaction.response.send_message("📌 أنت لست مسجلاً في إجازة حالياً أو تم سحب الرتبة منك مسبقاً.", ephemeral=True)
+            return
+
+        try:
+            await member.remove_roles(role)
+            for child in self.children:
+                child.disabled = True
+            await interaction.message.edit(view=self)
+            
+            await interaction.response.send_message("✅ تم إلغاء إجازتك بنجاح وإزالة رتبة الإجازة منك.", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ حدث خطأ أثناء إزالة الرتبة: {e}", ephemeral=True)
+
 class VacationAdminView(discord.ui.View):
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: int, guild_id: int):
         super().__init__(timeout=180)
         self.user_id = user_id
+        self.guild_id = guild_id
 
     def check_permissions(self, interaction: discord.Interaction):
         if interaction.user.guild_permissions.manage_guild:
@@ -78,14 +124,26 @@ class VacationAdminView(discord.ui.View):
         embed.add_field(name="📌 الحالة", value=f"✅ تم القبول بواسطة {interaction.user.mention}", inline=False)
 
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message("تم قبول الطلب بنجاح.", ephemeral=True)
+        await interaction.response.send_message("تم قبول الطلب بنجاح وإعطاء الرتبة للعضو.", ephemeral=True)
 
         try:
             member = interaction.guild.get_member(self.user_id)
+            if not member:
+                member = await interaction.guild.fetch_member(self.user_id)
+
             if member:
-                await member.send(f"🎉 تم **قبول** طلب إجازتك في سيرفر **{interaction.guild.name}**!")
-        except:
-            pass
+                role = interaction.guild.get_role(VACATION_ROLE_ID)
+                if role:
+                    await member.add_roles(role)
+
+                dm_view = CancelVacationView(interaction.guild.id)
+                await member.send(
+                    f"🎉 تم **قبول** طلب إجازتك في سيرفر **{interaction.guild.name}** وتم منحك رتبة الإجازة!\n"
+                    f"إذا أردت **إلغاء إجازتك** والعودة قبل انقضائها، يمكنك الضغط على الزر بالأسفل:",
+                    view=dm_view
+                )
+        except Exception as e:
+            print(f"Error giving vacation role or sending DM: {e}")
 
     @discord.ui.button(label="رفض", style=discord.ButtonStyle.danger, custom_id="reject_vacation_btn")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -105,6 +163,8 @@ class VacationAdminView(discord.ui.View):
 
         try:
             member = interaction.guild.get_member(self.user_id)
+            if not member:
+                member = await interaction.guild.fetch_member(self.user_id)
             if member:
                 await member.send(f"❌ للأسف، تم **رفض** طلب إجازتك في سيرفر **{interaction.guild.name}**.")
         except:
@@ -115,8 +175,8 @@ class Vacation(commands.Cog):
         self.bot = bot
 
     def cog_load(self):
-        # تسجيل الزر ليبقى يعمل بشكل دائم حتى بعد إعادة تشغيل البوت
         self.bot.add_view(VacationButtonView())
+        self.bot.add_view(CancelVacationView(0))
 
     @app_commands.command(name="setup_vacation", description="إرسال رسالة تقديم طلبات الإجازة مع زر التقديم")
     @app_commands.checks.has_permissions(manage_guild=True)
