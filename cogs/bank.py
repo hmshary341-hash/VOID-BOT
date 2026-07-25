@@ -216,6 +216,21 @@ class Bank(commands.Cog):
             ephemeral=True
         )
 
+    @app_commands.command(name="add_coins", description="أمر خاص بصاحب السيرفر لزيادة رصيد الكوينز")
+    @app_commands.describe(amount="عدد الكوينز المراد إضافتها")
+    async def add_coins(self, interaction: discord.Interaction, amount: int):
+        if interaction.user.id != OWNER_ID:
+            await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب السيرفر فقط!", ephemeral=True)
+            return
+
+        data = load_data()
+        user_data = get_user_data(data, interaction.user.id)
+        
+        user_data["coins"] += amount
+        save_data(data)
+
+        await interaction.response.send_message(f"👑 أهلاً بك يا طالبي العزيز! تم إضافة **{amount:,} كوينز** إلى رصيدك البنكي بنجاح. رصيدك الحالي: **{user_data['coins']:,} كوينز**", ephemeral=True)
+
     @app_commands.command(name="top", description="عرض قائمة أغنى الأعضاء في البنك")
     async def top(self, interaction: discord.Interaction):
         data = load_data()
