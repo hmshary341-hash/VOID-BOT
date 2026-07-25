@@ -9,8 +9,8 @@ import datetime
 os.makedirs("/app/data", exist_ok=True)
 DATA_FILE = "/app/data/economy.json"
 
-# آي دي الرتبة المسموح لها استخدام الأمر
-ROLE_ID = 1529995977203777566
+# **ضع الآي دي (ID) الخاص بك هنا** ليكون هذا الأمر مخصصاً لك وحدك
+OWNER_ID = 123456789012345678  # استبدل هذا الرقم بالآي دي حقك في ديسكورد
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -210,22 +210,25 @@ class Bank(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="add_coins", description="أمر خاص بصاحب الرتبة لزيادة رصيد الكوينز")
-    @app_commands.describe(amount="عدد الكوينز المراد إضافتها")
-    async def add_coins(self, interaction: discord.Interaction, amount: int):
-        # التحقق مما إذا كان العضو يمتلك الرتبة المطلوبة
-        has_role = any(role.id == ROLE_ID for role in interaction.user.roles)
-        if not has_role:
-            await interaction.response.send_message("❌ هذا الأمر مخصص لأصحاب الرتبة المحددة فقط!", ephemeral=True)
+    @app_commands.command(name="add_coins", description="أمر خاص بك لإضافة كوينز لأي شخص تحديداً")
+    @app_commands.describe(member="العضو المراد إعطاؤه الكوينز", amount="عدد الكوينز المراد إضافتها")
+    async def add_coins(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        # التحقق مما إذا كان المستخدم هو أنت حصرياً عبر الآي دي الخاص بك
+        if interaction.user.id != OWNER_ID:
+            await interaction.response.send_message("❌ هذا الأمر مخصص لك وحدك!", ephemeral=True)
+            return
+
+        if amount <= 0:
+            await interaction.response.send_message("❌ يجب أن يكون المبلغ أكبر من الصفر!", ephemeral=True)
             return
 
         data = load_data()
-        user_data = get_user_data(data, interaction.user.id)
+        target_data = get_user_data(data, member.id)
         
-        user_data["coins"] += amount
+        target_data["coins"] += amount
         save_data(data)
 
-        await interaction.response.send_message(f"👑 أهلاً بك! تم إضافة **{amount:,} كوينز** إلى رصيدك البنكي بنجاح. رصيدك الحالي: **{user_data['coins']:,} كوينز**", ephemeral=True)
+        await interaction.response.send_message(f"✅ تم إضافة **{amount:,} كوينز** إلى رصيد العضو {member.mention} بنجاح!\n🏦 رصيده الجديد: **{target_data['coins']:,} كوينز**", ephemeral=True)
 
     @app_commands.command(name="top", description="عرض قائمة أغنى الأعضاء في البنك")
     async def top(self, interaction: discord.Interaction):
