@@ -13,22 +13,22 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import asyncio
 
---- الإعدادات الأساسية ---
+# --- الإعدادات الأساسية ---
 
 LEVEL_UP_CHANNEL_ID = 1530087509407563797  # آي دي روم إرسال رسائل التلفل
 ALLOWED_ROLE_ID = 1529995977203777566     # آي دي الرتبة المسموح لها باستخدام أمر التصفير
 
---- إعدادات المخزن المؤقت ---
+# --- إعدادات المخزن المؤقت ---
 
 CACHE_DIR = Path("/app/data/image_cache")
 CACHE_MAX_AGE_DAYS = 7
 REQUEST_COOLDOWN = 1.0
 
---- رسالة التشجيع عند الترقية ---
+# --- رسالة التشجيع عند الترقية ---
 
 LEVEL_UP_ENCOURAGEMENT = "كفو على التفاعل كمل تفاعلك يا فله"
 
---- إعدادات رتب الألفل ---
+# --- إعدادات رتب الألفل ---
 
 LEVEL_ROLES = {
     1: "Bronze",
@@ -202,14 +202,10 @@ class Leveling(commands.Cog):
         self.db_setup()
 
     def db_setup(self):
-        # إنشاء مجلد البيانات داخل الـ Volume
         os.makedirs("/app/data", exist_ok=True)
-
         db_path = "/app/data/levels.db"
-
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.cursor = self.conn.cursor()
-
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER,
@@ -219,9 +215,7 @@ class Leveling(commands.Cog):
                 PRIMARY KEY (user_id, guild_id)
             )
         """)
-
         self.conn.commit()
-
         print(f"✅ Database loaded from: {db_path}")
 
     @commands.Cog.listener()
