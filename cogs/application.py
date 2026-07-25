@@ -11,6 +11,7 @@ ADMIN_ROLE_IDS = [
 ]  # الرتب المسموح لها بقبول/رفض التقديمات
 
 class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم الإدارة الرسمي"):
+    # تم تقصير العناوين لتكون أقل من 45 حرفاً (شرط ديسكورد)
     q1_q2 = discord.ui.TextInput(
         label="1 & 2. الاسم داخل ديسكورد + العمر",
         placeholder="مثال: Feras | العمر: 19 سنة",
@@ -18,7 +19,7 @@ class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم ال�
     )
     
     q3_q4 = discord.ui.TextInput(
-        label="3 & 4. ساعات التواجد + الخبرات السابقة",
+        label="3 & 4. التواجد + الخبرات السابقة",
         placeholder="التواجد: 6 ساعات | الخبرات: كنت مشرف في سيرفر...",
         max_length=200
     )
@@ -31,14 +32,14 @@ class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم ال�
     )
     
     q6_q7 = discord.ui.TextInput(
-        label="6. عضو سبّ؟ | 7. إداري خالف القوانين؟",
+        label="6. عضو سب؟ | 7. إداري خالف القوانين؟",
         placeholder="عضو: أعطيه تنبيه ثم ميوت... / إداري: أصوّر وأبلغ الإدارة العليا",
         style=discord.TextStyle.paragraph,
         max_length=300
     )
     
     q8_q9 = discord.ui.TextInput(
-        label="8. معرفة البوتات + 9. هل قرأت القوانين (نعم/لا)",
+        label="8. البوتات + 9. هل قرأت القوانين (نعم/لا)",
         placeholder="البوتات: ميراك، بروتك, الخ... / قرأت القوانين: نعم وألتزم بها",
         style=discord.TextStyle.paragraph,
         max_length=200
@@ -97,11 +98,10 @@ class ReviewView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"تم قبول التقديم بنجاح.", ephemeral=True)
         
-        # محاولة إرسال رسالة للمتقدم إذا كان مخزناً، أو جلبه من الـ Embed
         applicant = self.applicant
         if not applicant:
             try:
-                footer_text = embed.footer.text  # ID: 123456789
+                footer_text = embed.footer.text
                 user_id = int(footer_text.split(": ")[1])
                 applicant = interaction.guild.get_member(user_id)
             except:
