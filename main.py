@@ -2,15 +2,14 @@ import discord
 import os
 import asyncio
 from discord.ext import commands
-# استيراد كلاسات الـ Views من مجلد cogs
 from cogs.tickets import TicketActions, OpenTicketView
-from cogs.shop import StoreView  # استيراد فيو المتجر لضمان عمل الأزرار بشكل دائم
+from cogs.shop import StoreView  
 
 # إعداد الصلاحيات (Intents)
 intents = discord.Intents.all()
 
-# تعريف البوت
-bot = commands.Bot(command_prefix="!", intents=intents)
+# تعريف البوت وتغيير بادئة الأوامر إلى -
+bot = commands.Bot(command_prefix="-", intents=intents)
 
 # إضافة حدث on_ready (يتم تنفيذه عند تشغيل البوت)
 @bot.event
@@ -18,7 +17,7 @@ async def on_ready():
     # تسجيل الـ Views في ذاكرة البوت لتكون مستمرة (Persistent)
     bot.add_view(TicketActions())
     bot.add_view(OpenTicketView())
-    bot.add_view(StoreView())  # تسجيل فيو المتجر الجديد
+    bot.add_view(StoreView())  
     
     # مزامنة الأوامر
     await bot.tree.sync()
