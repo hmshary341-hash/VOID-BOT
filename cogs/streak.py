@@ -6,7 +6,7 @@ from datetime import datetime, date
 
 # --- الإعدادات ---
 STREAK_ROLE_ID = 1530367528046694500     # آي دي رتبة الستريك
-REMINDER_CHANNEL_ID = 1530050831636762839 # آي دي روم التذكير
+REMINDER_CHANNEL_ID = 1530050831636762839 # آي دي روم الستريك والتذكير
 
 class Streak(commands.Cog):
 
@@ -38,6 +38,20 @@ class Streak(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
+        # التحكد أن الرسالة في روم الستريك فقط
+        if message.channel.id != REMINDER_CHANNEL_ID:
+            return
+
+        # التحقق من أن الرسالة تحتوي على صورة (مرفقات صور)
+        has_image = any(
+            (att.content_type and 'image' in att.content_type) or 
+            att.filename.lower().endswith(('png', 'jpg', 'jpeg', 'gif', 'webp')) 
+            for att in message.attachments
+        )
+
+        if not has_image:
+            return  # إذا أرسل كلاماً بدون صورة في روم الستريك، لا يتم احتسابه كستريك
+
         user_id = message.author.id
         guild_id = message.guild.id
         today = str(date.today())
@@ -47,6 +61,8 @@ class Streak(commands.Cog):
             (user_id, guild_id)
         )
         result = self.cursor.fetchone()
+
+        status_text = ""
 
         if result is None:
             streak_count = 1
@@ -58,7 +74,9 @@ class Streak(commands.Cog):
         else:
             streak_count, last_date, shields = result
             if last_date == today:
-                return  # تفاعل اليوم مسبقاً، لا يتم احتساب تكرار نفس اليوم
+                # إذا أرسل صورة أخرى في نفس اليوم، نلغي التكرار أو نكتفي بتنبيهه
+                await message.reply("⚠️ لقد قمت بتسجيل ستريك اليوم مسبقاً!", delete_after=5)
+                return
 
             last_date_obj = datetime.strptime(last_date, "%Y-%m-%d").date()
             today_obj = date.today()
@@ -71,30 +89,15 @@ class Streak(commands.Cog):
                 if shields >= missed_days:
                     shields -= missed_days
                     streak_count += 1
-                    try:
-                        await message.channel.send(
-                            f"🛡️ {message.author.mention} لقد غبت {missed_days} يوم، وتم استهلاك **{missed_days} درع** لحماية ستريكك! الستريك المستمر: **{streak_count}** يوم."
-                        )
-                    except:
-                        pass
+                    status_text = f"\n🛡️ تم استهلاك **{missed_days} درع** لحماية ستريكك بسبب الغياب!"
                 else:
                     streak_count = 1
                     shields = 0
-                    try:
-                        await message.channel.send(
-                            f"💔 {message.author.mention} انقطع ستريكك لعدم وجود دروع كافية للحماية! عاد الستريك إلى 1."
-                        )
-                    except:
-                        pass
+                    status_text = f"\n💔 انقطع ستريكك لعدم كفاية الدروع وتمت إعادته إلى 1!"
 
             if streak_count == 5:
                 shields += 2
-                try:
-                    await message.channel.send(
-                        f"🎉 كفو {message.author.mention}! وصل ستريكك إلى **5 أيام** وحصلت على **2 درع 🛡️** لحماية ستريكك مستقبلاً!"
-                    )
-                except:
-                    pass
+                status_text += f"\n🎉 مبروك! وصل ستريكك إلى 5 أيام وحصلت على **2 درع 🛡️**!"
 
             self.cursor.execute(
                 "UPDATE streaks SET streak_count = ?, last_date = ?, shields = ? WHERE user_id = ? AND guild_id = ?",
@@ -102,12 +105,21 @@ class Streak(commands.Cog):
             )
         self.conn.commit()
 
+        # إعطاء رتبة الستريك
         role = message.guild.get_role(STREAK_ROLE_ID)
         if role and role not in message.author.roles:
             try:
                 await message.author.add_roles(role)
             except Exception as e:
                 print(f"❌ خطأ في إعطاء رتبة الستريك: {e}")
+
+        # إرسال رسالة عامة في الروم تؤكد تسجيل الستريك
+        await message.reply(
+            f"🔥 | {message.author.mention}\n"
+            f"• عدد أيام الستريك: **{streak_count}** يوم\n"
+            f"• عدد الدروع الحالية: **{shields} 🛡️**"
+            f"{status_text}"
+        )
 
     @tasks.loop(hours=24)
     async def daily_reminder(self):
