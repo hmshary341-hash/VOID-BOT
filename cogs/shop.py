@@ -1,6 +1,118 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
+import json
+import os
+
+# --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات ---
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+DATA_FILE = os.path.join(DATA_DIR, "economy.json")
+
+# --- أسعار وأتمتة المنتجات ---
+ROLES_SHOP = {
+    "ultra": {"name": "Ultra", "price": 75000, "role_id": 0},  # ضع آي دي رتبة Ultra هنا
+    "prime": {"name": "Prime", "price": 45000, "role_id": 0},  # ضع آي دي رتبة Prime هنا
+    "plus": {"name": "Plus", "price": 25000, "role_id": 0},    # ضع آي دي رتبة Plus هنا
+    "basic": {"name": "Basic", "price": 10000, "role_id": 0}   # ضع آي دي رتبة Basic هنا
+}
+
+TITLES_SHOP = {
+    "king": {"name": "King", "price": 60000, "role_id": 0},    # ضع آي دي رتبة King هنا
+    "queen": {"name": "Queen", "price": 60000, "role_id": 0}   # ضع آي دي رتبة Queen هنا
+}
+
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {}
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def get_user_coins(user_id):
+    data = load_data()
+    user_id = str(user_id)
+    if user_id not in data:
+        return 0
+    user_data = data[user_id]
+    if isinstance(user_data, int):
+        return user_data
+    return user_data.get("coins", 0)
+
+def deduct_user_coins(user_id, amount):
+    data = load_data()
+    user_id = str(user_id)
+    if user_id in data:
+        if isinstance(data[user_id], int):
+            data[user_id] = {"coins": max(0, data[user_id] - amount)}
+        else:
+            data[user_id]["coins"] = max(0, data[user_id].get("coins", 0) - amount)
+        save_data(data)
+
+# --- قائمة الشراء التفاعلية داخل التذكرة ---
+class PurchaseSelect(discord.ui.Select):
+    def __init__(self, shop_type: str):
+        self.shop_type = shop_type
+        items = ROLES_SHOP if shop_type == "roles" else TITLES_SHOP
+        
+        options = []
+        for key, item in items.items():
+            options.append(
+                discord.SelectOption(
+                    label=item["name"],
+                    description=f"السعر: {item['price']:,} كوينز",
+                    value=key
+                )
+            )
+        super().__init__(placeholder="اختر الغرض الذي تريد شراءه...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        item_key = self.values[0]
+        items_dict = ROLES_SHOP if self.shop_type == "roles" else TITLES_SHOP
+        item = items_dict[item_key]
+        
+        user_coins = get_user_coins(interaction.user.id)
+        price = item["price"]
+
+        if user_coins < price:
+            await interaction.response.send_message(
+                f"❌ ليس لديك رصيد كافٍ! رصيدك الحالي: **{user_coins:,} كوينز** وأنت بحاجة إلى **{price:,} كوينز** لشراء {item['name']}.", 
+                ephemeral=True
+            )
+            return
+
+        # خصم الكوينز وحفظها في الفوليوم
+        deduct_user_coins(interaction.user.id, price)
+
+        # محاولة إعطاء الرتبة إن وجد آي دي لها
+        role_given = False
+        if item["role_id"] != 0:
+            role = interaction.guild.get_role(item["role_id"])
+            if role:
+                try:
+                    await interaction.user.add_roles(role)
+                    role_given = True
+                except Exception as e:
+                    print(f"❌ خطأ في إعطاء الرتبة: {e}")
+
+        msg = f"🎉 مبروك! لقد اشتريت **{item['name']}** بنجاح مقابل **{price:,} كوينز**."
+        if role_given:
+            msg += "\n✨ تم منحك الرتبة تلقائياً!"
+        else:
+            msg += "\n📌 تم خصم المبلغ، يجدر بالإدارة تسليمك طلبك الآن."
+
+        await interaction.response.send_message(msg, ephemeral=False)
+
+class PurchaseView(discord.ui.View):
+    def __init__(self, shop_type: str):
+        super().__init__(timeout=None)
+        self.add_item(PurchaseSelect(shop_type))
 
 class StoreView(discord.ui.View):
     def __init__(self):
@@ -50,6 +162,9 @@ class StoreView(discord.ui.View):
 
         await interaction.followup.send(f"تم فتح تذكرتك بنجاح: {channel.mention}", ephemeral=True)
 
+        shop_type = "roles" if is_roles else "titles"
+        view = PurchaseView(shop_type)
+
         if is_roles:
             await channel.send(
                 f"أهلاً بك يا {user.mention} في **متجر الرتب**!\n"
@@ -58,7 +173,8 @@ class StoreView(discord.ui.View):
                 "🔹 **Prime** - السعر: 45,000 كوينز\n"
                 "🌟 **Plus** - السعر: 25,000 كوينز\n"
                 "⭐ **Basic** - السعر: 10,000 كوينز\n\n"
-                "الرجاء إبلاغ الإدارة بالرتبة التي ترغب بشرائها وطريقة الدفع."
+                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                view=view
             )
         else:
             await channel.send(
@@ -66,7 +182,8 @@ class StoreView(discord.ui.View):
                 "إليك قائمة الألقاب المتاحة للشراء:\n\n"
                 "👑 **King** - السعر: 60,000 كوينز\n"
                 "👑 **Queen** - السعر: 60,000 كوينز\n\n"
-                "الرجاء إبلاغ الإدارة باللقب الذي ترغب بشرائه وطريقة الدفع."
+                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                view=view
             )
 
 class Shop(commands.Cog):
