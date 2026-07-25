@@ -9,8 +9,8 @@ import datetime
 os.makedirs("/app/data", exist_ok=True)
 DATA_FILE = "/app/data/economy.json"
 
-# تم ضبط الآي دي الخاص بك هنا
-OWNER_ID = 1529995977203777566
+# آي دي الرتبة المسموح لها استخدام الأمر
+ROLE_ID = 1529995977203777566
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -101,7 +101,7 @@ class Bank(commands.Cog):
 
         await interaction.response.send_message(f"🛠️ عملت بجد وربحت **{earned:,} كوينز** أضيفت لحسابك البنكي!", ephemeral=True)
 
-    @app_commands.command(name="coinflip", description="لعبة مراهنة البنك: لا محدودة (الخاسر تحول فلوسه لحساب البنك الخاص بك)")
+    @app_commands.command(name="coinflip", description="لعبة مراهنة البنك: لا محدودة")
     @app_commands.describe(amount="عدد الكوينز التي تريد المراهنة بها")
     async def coinflip(self, interaction: discord.Interaction, amount: int):
         data = load_data()
@@ -122,12 +122,6 @@ class Bank(commands.Cog):
             await interaction.response.send_message(f"🎉 مبروك! فزت بالرهان وضاعفت مبلغك. ربحت **{amount:,} كوينز**! رصيدك الجديد: **{user_data['coins']:,} كوينز**")
         else:
             user_data["coins"] -= amount
-            
-            # تحويل المبلغ الخاسر إلى حسابك البنكي الخاص
-            if interaction.user.id != OWNER_ID:
-                owner_data = get_user_data(data, OWNER_ID)
-                owner_data["coins"] += amount
-
             save_data(data)
             await interaction.response.send_message(f"😢 للأسف خسرت الرهان وخسرت **{amount:,} كوينز**. رصيدك الجديد: **{user_data['coins']:,} كوينز**")
 
@@ -216,11 +210,13 @@ class Bank(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="add_coins", description="أمر خاص بصاحب السيرفر لزيادة رصيد الكوينز")
+    @app_commands.command(name="add_coins", description="أمر خاص بصاحب الرتبة لزيادة رصيد الكوينز")
     @app_commands.describe(amount="عدد الكوينز المراد إضافتها")
     async def add_coins(self, interaction: discord.Interaction, amount: int):
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message("❌ هذا الأمر مخصص لصاحب السيرفر فقط!", ephemeral=True)
+        # التحقق مما إذا كان العضو يمتلك الرتبة المطلوبة
+        has_role = any(role.id == ROLE_ID for role in interaction.user.roles)
+        if not has_role:
+            await interaction.response.send_message("❌ هذا الأمر مخصص لأصحاب الرتبة المحددة فقط!", ephemeral=True)
             return
 
         data = load_data()
@@ -229,7 +225,7 @@ class Bank(commands.Cog):
         user_data["coins"] += amount
         save_data(data)
 
-        await interaction.response.send_message(f"👑 أهلاً بك يا طالبي العزيز! تم إضافة **{amount:,} كوينز** إلى رصيدك البنكي بنجاح. رصيدك الحالي: **{user_data['coins']:,} كوينز**", ephemeral=True)
+        await interaction.response.send_message(f"👑 أهلاً بك! تم إضافة **{amount:,} كوينز** إلى رصيدك البنكي بنجاح. رصيدك الحالي: **{user_data['coins']:,} كوينز**", ephemeral=True)
 
     @app_commands.command(name="top", description="عرض قائمة أغنى الأعضاء في البنك")
     async def top(self, interaction: discord.Interaction):
