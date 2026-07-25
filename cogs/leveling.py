@@ -12,6 +12,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime, timedelta
 import asyncio
+import time
 
 # --- الإعدادات الأساسية ---
 
@@ -199,6 +200,7 @@ async def generate_card(member, xp, level, role_name="Member"):
 class Leveling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.cooldowns = {}
         self.db_setup()
 
     def db_setup(self):
@@ -225,6 +227,14 @@ class Leveling(commands.Cog):
 
         user_id = message.author.id
         guild_id = message.guild.id
+
+        current_time = time.time()
+        cooldown_key = (user_id, guild_id)
+        if cooldown_key in self.cooldowns:
+            if current_time - self.cooldowns[cooldown_key] < 10:
+                return
+        self.cooldowns[cooldown_key] = current_time
+
         earned_xp = random.randint(15, 25)
 
         try:
