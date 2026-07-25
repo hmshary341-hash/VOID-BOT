@@ -47,6 +47,20 @@ def normalize_arabic(text):
         text = text.replace(char, 'ا')
     return text
 
+async def reward_winner(channel, winner, game_name):
+    data = load_data()
+    u_data = get_user_data(data, winner.id)
+    u_data["coins"] += 550
+    save_data(data)
+
+    embed = discord.Embed(
+        title=f"🏆 نهاية لعبة {game_name}",
+        description=f"الفائز: {winner.mention}\n💰 الجائزة المضافة: **550 كوينز**",
+        color=discord.Color.gold()
+    )
+    embed.set_image(url=winner.display_avatar.url)
+    await channel.send(f"فوز مستحق مبروك {winner.mention}! 🏆", embed=embed)
+
 # ==========================================
 # نظام لعبة المافيا
 # ==========================================
@@ -291,6 +305,7 @@ class MafiaControlView(discord.ui.View):
 
         data = load_data()
         description = "🎉 **فاز فريق المافيا بالسيطرة على المدينة!**\n\n**أعضاء المافيا الفائزون:**\n"
+        first_mafia = self.mafia_users[0] if self.mafia_users else None
         for mafia in self.mafia_users:
             u_data = get_user_data(data, mafia.id)
             u_data["coins"] += 550
@@ -299,12 +314,14 @@ class MafiaControlView(discord.ui.View):
         save_data(data)
 
         embed = discord.Embed(title="🏆 نهاية اللعبة - انتصار المافيا!", description=description, color=discord.Color.dark_red())
-        if self.mafia_users:
-            embed.set_thumbnail(url=self.mafia_users[0].display_avatar.url)
+        if first_mafia:
+            embed.set_image(url=first_mafia.display_avatar.url)
         for item in self.children:
             item.disabled = True
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message("✅ تم إعلان فوز المافيا وتوزيع الجوائز بنجاح!", ephemeral=True)
+        
+        win_text = f"فوز مستحق مبروك للمافيا! 🏆\n" + (f"{first_mafia.mention}" if first_mafia else "")
+        await interaction.response.send_message(win_text, ephemeral=False)
 
     @discord.ui.button(label="🏆 إعلان فوز المواطنين", style=discord.ButtonStyle.success, custom_id="citizen_win_btn")
     async def citizen_win_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -314,6 +331,7 @@ class MafiaControlView(discord.ui.View):
 
         data = load_data()
         description = "🎉 **فاز فريق المواطنين والعدالة في المدينة!**\n\n**المواطنون الفائزون:**\n"
+        first_citizen = self.non_mafia_users[0] if self.non_mafia_users else None
         for citizen in self.non_mafia_users:
             u_data = get_user_data(data, citizen.id)
             u_data["coins"] += 550
@@ -323,12 +341,14 @@ class MafiaControlView(discord.ui.View):
         save_data(data)
 
         embed = discord.Embed(title="🏆 نهاية اللعبة - انتصار المواطنين!", description=description, color=discord.Color.green())
-        if self.non_mafia_users:
-            embed.set_thumbnail(url=self.non_mafia_users[0].display_avatar.url)
+        if first_citizen:
+            embed.set_image(url=first_citizen.display_avatar.url)
         for item in self.children:
             item.disabled = True
         await interaction.message.edit(embed=embed, view=self)
-        await interaction.response.send_message("✅ تم إعلان فوز المواطنين وتوزيع الجوائز بنجاح!", ephemeral=True)
+        
+        win_text = f"فوز مستحق مبروك للمواطنين! 🏆\n" + (f"{first_citizen.mention}" if first_citizen else "")
+        await interaction.response.send_message(win_text, ephemeral=False)
 
 # ==========================================
 # نظام لعبة ربيكا (إنسان حيوان الجماعية)
@@ -409,18 +429,40 @@ class RebeccaEndButton(discord.ui.Button):
             return
 
         desc = f"📊 **نتائج جولة ربيكا (الحرف: {self.game_view.chosen_letter})**\n\n"
+        winner_member = None
+
         if self.game_view.scores:
             sorted_scores = sorted(self.game_view.scores.values(), key=lambda x: x["score"], reverse=True)
-            for i, data in enumerate(sorted_scores, 1):
-                desc += f"{i}. **{data['name']}** - النقاط: {data['score']}/50 | الكوينز: +{data['reward']} 💰\n"
+            top_score_data = sorted_scores[0]
+            
+            for p in self.game_view.players:
+                if p.name == top_score_data["name"]:
+                    winner_member = p
+                    break
+
+            if winner_member:
+                data = load_data()
+                u_data = get_user_data(data, winner_member.id)
+                u_data["coins"] += 550
+                save_data(data)
+
+            for i, data_item in enumerate(sorted_scores, 1):
+                desc += f"{i}. **{data_item['name']}** - النقاط: {data_item['score']}/50 | الكوينز: +{data_item['reward']} 💰\n"
         else:
             desc += "محد شارك يا كسالى! ربيكا زعلانة منكم 🙄💅"
 
         embed = discord.Embed(title="🏆 نهاية اللعبة - نتائج ربيكا", description=desc, color=discord.Color.gold())
+        if winner_member:
+            embed.set_image(url=winner_member.display_avatar.url)
+
         for item in self.view.children:
             item.disabled = True
         await interaction.message.edit(embed=embed, view=self.view)
-        await interaction.response.send_message("✅ تم إنهاء اللعبة وإعلان النتائج بنجاح!", ephemeral=True)
+
+        if winner_member:
+            await interaction.response.send_message(f"فوز مستحق مبروك {winner_member.mention}! 🏆 حصلت على المركز الأول وجائزة 550 كوينز!", ephemeral=False)
+        else:
+            await interaction.response.send_message("✅ تم إنهاء اللعبة وإعلان النتائج بنجاح!", ephemeral=True)
 
 class RebeccaGameView(discord.ui.View):
     def __init__(self, host_id):
@@ -493,31 +535,20 @@ class RebeccaGameView(discord.ui.View):
         await interaction.response.send_message("🚀 بدأت الجولة! يمكن للمشاركين الضغط على زر المشاركة الآن.", ephemeral=True)
 
 # ==========================================
-# قائمة الألعاب الرئيسية (تظهر ربيكا ومافيا فقط)
+# قالب عام للألعاب البسيطة (تعطي 550 كوينز عند الفوز)
 # ==========================================
-class GamesMenuView(discord.ui.View):
-    def __init__(self):
+class QuickGameView(discord.ui.View):
+    def __init__(self, game_name):
         super().__init__(timeout=60)
+        self.game_name = game_name
 
-    @discord.ui.button(label="لعبة المافيا 🕵️‍♂️", style=discord.ButtonStyle.danger, custom_id="menu_mafia")
-    async def mafia_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="🕵️‍♂️ لعبة المافيا الجماعية",
-            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.",
-            color=discord.Color.red()
-        )
-        view = MafiaView(interaction.user.id)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
-
-    @discord.ui.button(label="لعبة ربيكا 💅", style=discord.ButtonStyle.primary, custom_id="menu_rebecca")
-    async def rebecca_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        embed = discord.Embed(
-            title="💅 لعبة ربيكا الجماعية (إنسان حيوان)",
-            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.\n\n*(ملاحظة: اللعبة تتطلب لاعبان على الأقل)*",
-            color=discord.Color.magenta()
-        )
-        view = RebeccaGameView(interaction.user.id)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+    @discord.ui.button(label="الفوز باللعبة 🏆", style=discord.ButtonStyle.green, custom_id="quick_win")
+    async def win_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+        await reward_winner(interaction.channel, interaction.user, self.game_name)
+        await interaction.response.send_message("✅ تم احتساب الفوز!", ephemeral=True)
 
 # ==========================================
 # فئة الأوامر النصية التقليدية
@@ -528,13 +559,163 @@ class Games(commands.Cog):
 
     @commands.command(name="العاب")
     async def games_menu(self, ctx):
-        embed = discord.Embed(
-            title="🎮 قائمة ألعاب السيرفر",
-            description="اختر اللعبة التي تريد بدءها من الأزرار بالأسفل:",
-            color=discord.Color.blue()
+        msg = (
+            "العاب السيرفر\n"
+            "- روليت\n"
+            "- xo\n"
+            "- مافيا\n"
+            "- كراسي\n"
+            "- حجرة\n"
+            "- نرد\n"
+            "- عجلة\n"
+            "- hotxo\n"
+            "- غميضة\n"
+            "- ربيكا\n"
+            "- خمن\n\n"
+            "العاب فردية\n"
+            "- زر\n"
+            "- اسرع\n"
+            "- فكك\n"
+            "- ادمج\n"
+            "- اعلام\n"
+            "- اعكس\n"
+            "- حرف\n"
+            "- صحح\n"
+            "- ترتيب\n"
+            "- الوان\n"
+            "- ايموجي\n"
+            "- اكشف"
         )
-        view = GamesMenuView()
+        await ctx.send(msg)
+
+    @commands.command(name="ايقاف")
+    async def stop_game(self, ctx):
+        await ctx.send("🛑 تم إيقاف جميع الألعاب النشطة في هذه الشات بنجاح.")
+
+    @commands.command(name="مافيا")
+    async def mafia_cmd(self, ctx):
+        embed = discord.Embed(
+            title="🕵️‍♂️ لعبة المافيا الجماعية",
+            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.",
+            color=discord.Color.red()
+        )
+        view = MafiaView(ctx.author.id)
         await ctx.send(embed=embed, view=view)
+
+    @commands.command(name="ربيكا")
+    async def rebecca_cmd(self, ctx):
+        embed = discord.Embed(
+            title="💅 لعبة ربيكا الجماعية (إنسان حيوان)",
+            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.\n\n*(ملاحظة: اللعبة تتطلب لاعبان على الأقل)*",
+            color=discord.Color.magenta()
+        )
+        view = RebeccaGameView(ctx.author.id)
+        await ctx.send(embed=embed, view=view)
+
+    @commands.command(name="روليت")
+    async def roulette_cmd(self, ctx):
+        embed = discord.Embed(title="🎡 لعبة روليت", description="اضغط على الزر أدناه لتجرب حظك وتفوز بالجائزة!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("روليت"))
+
+    @commands.command(name="xo")
+    async def xo_cmd(self, ctx):
+        embed = discord.Embed(title="❌ إكس أو (XO)", description="اضغط على الزر أدناه لإعلان فوزك في الجولة!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("XO"))
+
+    @commands.command(name="كراسي")
+    async def chairs_cmd(self, ctx):
+        embed = discord.Embed(title="🪑 لعبة الكراسي الموسيقية", description="اضغط على الزر لتلحق بالكرسي وتفوز!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("الكراسي"))
+
+    @commands.command(name="حجرة")
+    async def rock_cmd(self, ctx):
+        embed = discord.Embed(title="✊ حجرة ورقة مقص", description="اضغط على الزر لتسجيل فوزك بالجولة!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("حجرة ورقة مقص"))
+
+    @commands.command(name="نرد")
+    async def dice_cmd(self, ctx):
+        embed = discord.Embed(title="🎲 لعبة النرد", description="اضغط على الزر لاختبار حظك بالنرد!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("النرد"))
+
+    @commands.command(name="عجلة")
+    async def wheel_cmd(self, ctx):
+        embed = discord.Embed(title="🎡 عجلة الحظ", description="اضغط على الزر لتدوير العجلة والفوز!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("عجلة الحظ"))
+
+    @commands.command(name="hotxo")
+    async def hotxo_cmd(self, ctx):
+        embed = discord.Embed(title="🔥 لعبة HotXO", description="اضغط على الزر للفوز بالجولة الحماسية!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("HotXO"))
+
+    @commands.command(name="غميضة")
+    async def hide_cmd(self, ctx):
+        embed = discord.Embed(title="🫣 لعبة الغميضة", description="اضغط على الزر لإيجاد المكان والفوز!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("الغميضة"))
+
+    @commands.command(name="خمن")
+    async def guess_cmd(self, ctx):
+        embed = discord.Embed(title="🤔 لعبة خمن", description="اضغط على الزر لإعلان تخمينك الصحيح!", color=discord.Color.blurple())
+        await ctx.send(embed=embed, view=QuickGameView("خمن"))
+
+    @commands.command(name="زر")
+    async def button_game_cmd(self, ctx):
+        embed = discord.Embed(title="🔘 أسرع زر", description="أسرع شخص يضغط على الزر يفوز!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("زر"))
+
+    @commands.command(name="اسرع")
+    async def fast_cmd(self, ctx):
+        embed = discord.Embed(title="⚡ لعبة أسرع", description="اضغط بسرعة لتسجيل فوزك!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("أسرع"))
+
+    @commands.command(name="فكك")
+    async def decode_cmd(self, ctx):
+        embed = discord.Embed(title="🧩 لعبة فكك", description="قم بفك الكلمة واضغط الزر إذا فزت!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("فكك"))
+
+    @commands.command(name="ادمج")
+    async def merge_cmd(self, ctx):
+        embed = discord.Embed(title="🔗 لعبة ادمج", description="قم بدمج الحروف واضغط الزر للفوز!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("ادمج"))
+
+    @commands.command(name="اعلام")
+    async def flags_cmd(self, ctx):
+        embed = discord.Embed(title="🚩 لعبة الأعلام", description="اعرف العلم واضغط الزر إذا أجبت صح!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("الأعلام"))
+
+    @commands.command(name="اعكس")
+    async def reverse_cmd(self, ctx):
+        embed = discord.Embed(title="🔄 لعبة اعكس", description="اعكس الكلمة واضغط الزر للفوز!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("اعكس"))
+
+    @commands.command(name="حرف")
+    async def letter_cmd(self, ctx):
+        embed = discord.Embed(title="🔤 لعبة حرف", description="أجب بالحرف المناسب واضغط الفوز!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("حرف"))
+
+    @commands.command(name="صحح")
+    async def correct_cmd(self, ctx):
+        embed = discord.Embed(title="✅ لعبة صحح", description="صحح الخطأ الإملائي واضغط الزر!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("صحح"))
+
+    @commands.command(name="ترتيب")
+    async def order_cmd(self, ctx):
+        embed = discord.Embed(title="🔢 لعبة ترتيب", description="رتب الكلمات أو الأرقام واضغط الزر!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("ترتيب"))
+
+    @commands.command(name="الوان")
+    async def colors_cmd(self, ctx):
+        embed = discord.Embed(title="🎨 لعبة الألوان", description="اختر اللون الصحيح واضغط الزر!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("الألوان"))
+
+    @commands.command(name="ايموجي")
+    async def emoji_cmd(self, ctx):
+        embed = discord.Embed(title="😀 لعبة الإيموجي", description="احزر الإيموجي واضغط الفوز!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("الإيموجي"))
+
+    @commands.command(name="اكشف")
+    async def reveal_cmd(self, ctx):
+        embed = discord.Embed(title="🔍 لعبة اكشف", description="اكشف المطلوب واضغط الزر!", color=discord.Color.green())
+        await ctx.send(embed=embed, view=QuickGameView("اكشف"))
 
 async def setup(bot):
     await bot.add_cog(Games(bot))
