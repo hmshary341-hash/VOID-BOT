@@ -1,148 +1,9 @@
-import json
-import os
 import discord
 from discord import app_commands
 from discord.ext import commands
 
-DATA_DIR = "/app/data"
-os.makedirs(DATA_DIR, exist_ok=True)
-CONFIG_FILE = os.path.join(DATA_DIR, "temp_voice.json")
 
-
-def load_config():
-  if not os.path.exists(CONFIG_FILE):
-    return {}
-  try:
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-      return json.load(f)
-  except Exception:
-    return {}
-
-
-def save_config(data):
-  with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-    json.dump(data, f, indent=4, ensure_ascii=False)
-
-
-# --- نافذة إدخال بيانات الدعوة (Modal) ---
-class InviteModal(discord.ui.Modal, title="دعوة عضو للروم الصوتية"):
-  user_input = discord.ui.TextInput(
-      label="يوزر أو آي دي العضو المراد دعوته",
-      placeholder="مثال: username أو الآي دي الخاص به",
-      required=True,
-  )
-
-  async def on_submit(self, interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    channel = interaction.user.voice.channel
-
-    if not channel:
-      return await interaction.followup.send(
-          "❌ يجب أن تكون متصلاً برومتك الصوتية لتتمكن من دعوة الأعضاء.",
-          ephemeral=True,
-      )
-
-    target_text = self.user_input.value.strip()
-    clean_id = target_text.strip("<@!>")
-
-    target_member = None
-    if clean_id.isdigit():
-      target_member = interaction.guild.get_member(int(clean_id))
-    else:
-      for m in interaction.guild.members:
-        if (
-            target_text.lower() in m.name.lower()
-            or target_text.lower() in m.display_name.lower()
-        ):
-          target_member = m
-          break
-
-    if not target_member:
-      return await interaction.followup.send(
-          "❌ لم يتم العثور على هذا العضو، تأكد من صحة اليوزر أو الآي دي.",
-          ephemeral=True,
-      )
-
-    channel_link = f"https://discord.com/channels/{interaction.guild.id}/{channel.id}"
-
-    try:
-      await target_member.send(
-          f"📢 دعوة لك من {interaction.user.mention}!\nاقلط/ي بالسالفه القوية الي"
-          f" هنا 👇\n🔗 {channel_link}"
-      )
-      await interaction.followup.send(
-          f"✅ تم إرسال الدعوة إلى {target_member.mention} بنجاح عبر الخاص!",
-          ephemeral=True,
-      )
-    except Exception:
-      await interaction.followup.send(
-          f"❌ تعذر إرسال رسالة خاصة إلى {target_member.mention} (قد تكون رسائله"
-          " الخاصة مغلقة).",
-          ephemeral=True,
-      )
-
-
-# --- نافذة إدخال بيانات الطرد (Modal) ---
-class KickModal(discord.ui.Modal, title="طرد عضو من الروم الصوتية"):
-  user_input = discord.ui.TextInput(
-      label="يوزر أو آي دي العضو المراد طرده",
-      placeholder="مثال: username أو الآي دي الخاص به",
-      required=True,
-  )
-
-  async def on_submit(self, interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
-    channel = interaction.user.voice.channel
-
-    if not channel:
-      return await interaction.followup.send(
-          "❌ يجب أن تكون متصلاً برومتك الصوتية لتتمكن من طرد الأعضاء.",
-          ephemeral=True,
-      )
-
-    target_text = self.user_input.value.strip()
-    clean_id = target_text.strip("<@!>")
-
-    target_member = None
-    if clean_id.isdigit():
-      target_member = interaction.guild.get_member(int(clean_id))
-    else:
-      for m in interaction.guild.members:
-        if (
-            target_text.lower() in m.name.lower()
-            or target_text.lower() in m.display_name.lower()
-        ):
-          target_member = m
-          break
-
-    if not target_member:
-      return await interaction.followup.send(
-          "❌ لم يتم العثور على هذا العضو في السيرفر.", ephemeral=True
-      )
-
-    if (
-        not target_member.voice
-        or not target_member.voice.channel
-        or target_member.voice.channel.id != channel.id
-    ):
-      return await interaction.followup.send(
-          f"❌ العضو {target_member.mention} ليس موجوداً في رومك الصوتية حالياً.",
-          ephemeral=True,
-      )
-
-    try:
-      await target_member.move_to(None)
-      await interaction.followup.send(
-          f"👢 تم طرد {target_member.mention} من رومك بنجاح.", ephemeral=True
-      )
-    except Exception:
-      await interaction.followup.send(
-          "❌ حدث خطأ أثناء محاولة طرد العضو، تأكد من صلاحيات البوت.",
-          ephemeral=True,
-      )
-
-
-# --- نافذة تغيير اسم الروم (Modal) ---
+# --- نافذة تغيير اسم الروم ---
 class RenameModal(discord.ui.Modal, title="تغيير اسم الروم الصوتية"):
   new_name = discord.ui.TextInput(
       label="اسم الروم الجديد",
@@ -153,25 +14,133 @@ class RenameModal(discord.ui.Modal, title="تغيير اسم الروم الصو
 
   async def on_submit(self, interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
-    channel = interaction.user.voice.channel
 
-    if not channel:
+    voice_state = interaction.user.voice
+    if not voice_state or not voice_state.channel:
       return await interaction.followup.send(
           "❌ يجب أن تكون متصلاً برومتك الصوتية لتتمكن من تغيير اسمها.",
           ephemeral=True,
       )
 
+    channel = voice_state.channel
+    target_name = self.new_name.value.strip()
+
     try:
-      await channel.edit(name=self.new_name.value.strip())
+      # تعديل الاسم مباشرة
+      await channel.edit(name=target_name, reason=fتم التغيير بواسطة {interaction.user})
       await interaction.followup.send(
-          f"✅ تم تغيير اسم الروم بنجاح إلى: **{self.new_name.value.strip()}**",
+          f"✅ تم تغيير اسم الروم بنجاح إلى: **{target_name}**", ephemeral=True
+      )
+    except discord.Forbidden:
+      await interaction.followup.send(
+          "❌ ليس لدى البوت أو لديك الصلاحية الكافية لتعديل اسم الروم.",
           ephemeral=True,
+      )
+    except Exception as e:
+      await interaction.followup.send(
+          f"❌ حدث خطأ أثناء تغيير الاسم: `{e}`", ephemeral=True
+      )
+
+
+# --- نافذة دعوة عضو ---
+class InviteModal(discord.ui.Modal, title="دعوة عضو للروم الصوتية"):
+  user_input = discord.ui.TextInput(
+      label="يوزر أو آي دي العضو المراد دعوته",
+      placeholder="اكتب يوزر العضو هنا...",
+      required=True,
+  )
+
+  async def on_submit(self, interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    voice_state = interaction.user.voice
+    if not voice_state or not voice_state.channel:
+      return await interaction.followup.send(
+          "❌ يجب أن تكون متصلاً برومتك.", ephemeral=True
+      )
+
+    channel = voice_state.channel
+    target_text = self.user_input.value.strip().strip("<@!>")
+    target_member = None
+
+    if target_text.isdigit():
+      target_member = interaction.guild.get_member(int(target_text))
+    else:
+      for m in interaction.guild.members:
+        if (
+            target_text.lower() in m.name.lower()
+            or target_text.lower() in m.display_name.lower()
+        ):
+          target_member = m
+          break
+
+    if not target_member:
+      return await interaction.followup.send(
+          "❌ لم يتم العثور على هذا العضو.", ephemeral=True
+      )
+
+    channel_link = f"https://discord.com/channels/{interaction.guild.id}/{channel.id}"
+    try:
+      await target_member.send(
+          f"📢 دعوة لك من {interaction.user.mention}!\nاقلط/ي بالسالفه القوية الي"
+          f" هنا 👇\n🔗 {channel_link}"
+      )
+      await interaction.followup.send(
+          f"✅ تم إرسال الدعوة إلى {target_member.mention} بنجاح!", ephemeral=True
       )
     except Exception:
       await interaction.followup.send(
-          "❌ حدث خطأ أثناء محاولة تغيير اسم الروم، تأكد من صلاحيات البوت.",
-          ephemeral=True,
+          "❌ تعذر إرسال رسالة خاصة (رسائله مغلقة).", ephemeral=True
       )
+
+
+# --- نافذة طرد عضو ---
+class KickModal(discord.ui.Modal, title="طرد عضو من الروم الصوتية"):
+  user_input = discord.ui.TextInput(
+      label="يوزر أو آي دي العضو المراد طرده",
+      placeholder="اكتب يوزر العضو هنا...",
+      required=True,
+  )
+
+  async def on_submit(self, interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    voice_state = interaction.user.voice
+    if not voice_state or not voice_state.channel:
+      return await interaction.followup.send(
+          "❌ يجب أن تكون متصلاً برومتك.", ephemeral=True
+      )
+
+    channel = voice_state.channel
+    target_text = self.user_input.value.strip().strip("<@!>")
+    target_member = None
+
+    if target_text.isdigit():
+      target_member = interaction.guild.get_member(int(target_text))
+    else:
+      for m in interaction.guild.members:
+        if (
+            target_text.lower() in m.name.lower()
+            or target_text.lower() in m.display_name.lower()
+        ):
+          target_member = m
+          break
+
+    if (
+        not target_member
+        or not target_member.voice
+        or not target_member.voice.channel
+        or target_member.voice.channel.id != channel.id
+    ):
+      return await interaction.followup.send(
+          "❌ العضو غير موجود في رومك حالياً.", ephemeral=True
+      )
+
+    try:
+      await target_member.move_to(None)
+      await interaction.followup.send(
+          f"👢 تم طرد {target_member.mention} من رومك.", ephemeral=True
+      )
+    except Exception:
+      await interaction.followup.send("❌ حدث خطأ أثناء الطرد.", ephemeral=True)
 
 
 # --- لوحة التحكم التفاعلية بالأزرار ---
@@ -303,20 +272,24 @@ class TempVoice(commands.Cog):
       before: discord.VoiceState,
       after: discord.VoiceState,
   ):
-    data = load_config()
-    guild_id = str(member.guild.id)
-    guild_config = data.get(guild_id, {})
-    creator_channel_id = guild_config.get("creator_channel_id")
-
-    if after.channel and after.channel.id == creator_channel_id:
+    # التعرف التلقائي على روم الإنشاء (إذا كان الاسم يحتوي على "انشاء" أو يبدأ بـ "+")
+    if after.channel and (
+        "انشاء" in after.channel.name.lower()
+        or after.channel.name.startswith("+")
+    ):
       category = after.channel.category
       guild = member.guild
       channel_name = f"🔊 | روم {member.display_name}"
 
+      # إعطاء العضو صلاحيات كاملة لإدارة الروم (تتضمن تعديل الاسم والتحكم)
       overwrites = {
           guild.default_role: discord.PermissionOverwrite(connect=True),
           member: discord.PermissionOverwrite(
-              manage_channel=True, connect=True, speak=True, move_members=True
+              manage_channel=True,
+              connect=True,
+              speak=True,
+              move_members=True,
+              view_channel=True,
           ),
       }
 
@@ -329,6 +302,7 @@ class TempVoice(commands.Cog):
       except Exception as e:
         print(f"❌ خطأ في إنشاء الروم المؤقتة: {e}")
 
+    # حذف الروم تلقائياً عند خروج الجميع منها
     if before.channel and before.channel.id in self.temp_channels:
       if len(before.channel.members) == 0:
         try:
@@ -336,29 +310,6 @@ class TempVoice(commands.Cog):
           del self.temp_channels[before.channel.id]
         except Exception as e:
           print(f"❌ خطأ في حذف الروم المؤقتة: {e}")
-
-  @app_commands.command(
-      name="set_temp_voice",
-      description="تحديد روم إنشاء الروم الصوتية المؤقتة",
-  )
-  @app_commands.describe(channel="روم الصوت المخصصة للإنشاء")
-  @app_commands.default_permissions(administrator=True)
-  async def set_temp_voice(
-      self, interaction: discord.Interaction, channel: discord.VoiceChannel
-  ):
-    await interaction.response.defer(ephemeral=True)
-    data = load_config()
-    guild_id = str(interaction.guild.id)
-
-    if guild_id not in data:
-      data[guild_id] = {}
-
-    data[guild_id]["creator_channel_id"] = channel.id
-    save_config(data)
-
-    await interaction.followup.send(
-        f"✅ تم تعيين روم الإنشاء بنجاح إلى: {channel.mention}", ephemeral=True
-    )
 
   @app_commands.command(
       name="setup_temp_panel",
