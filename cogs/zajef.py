@@ -42,16 +42,30 @@ AUTO_RESPONSES = {
 class AutoReply(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.cooldowns = {}  # لتخزين وقت آخر رد لكل كلمة مفتاحية
+        self.cooldowns = {}  # مخصص للردود الملكعة فقط
 
     @commands.Cog.listener()
-    async def on_message(self, message):
+    async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
 
         user_message = message.content.strip()
+
+        # 1. رد السلام (بدون أي كوول داون نهائياً، يرد في كل مرة فوراً)
+        greetings = [
+            "السلام عليكم", 
+            "السلام عليكم ورحمة الله وبركاته", 
+            "السلام عليكم ورحمة الله", 
+            "سلام عليكم"
+        ]
+        
+        if any(greet in user_message for greet in greetings):
+            await message.reply("وعليكم السلام ورحمة الله وبركاته 🌹")
+            return
+
+        # 2. الردود الملكعة والزاحفة (مع نظام الكوول داون)
         current_time = time.time()
-        COOLDOWN_TIME = 120  # الوقت بالثواني (120 ثانية = دقيقتين)
+        COOLDOWN_TIME = 120  # دقيقتين
 
         for keyword, response in AUTO_RESPONSES.items():
             if "/" in keyword:
@@ -61,15 +75,11 @@ class AutoReply(commands.Cog):
                 variations = [keyword]
 
             if any(v in user_message for v in variations):
-                # التحقق من التايمر للكلمة
                 last_time = self.cooldowns.get(keyword, 0)
                 if current_time - last_time < COOLDOWN_TIME:
-                    # إذا ما خلصت الدقيقتين، يتجاهل الرد ولا يسوي سبام
                     break
 
-                # تحديث وقت آخر استخدام للكلمة
                 self.cooldowns[keyword] = current_time
-                
                 await message.reply(response)
                 break
 
