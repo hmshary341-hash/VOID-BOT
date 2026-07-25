@@ -6,20 +6,22 @@ import os
 import random
 import datetime
 
-DATA_FILE = "economy.json"
+os.makedirs("/app/data", exist_ok=True)
+DATA_FILE = "/app/data/economy.json"
 
 # تم ضبط الآي دي الخاص بك هنا
 OWNER_ID = 1529995977203777566
 
 def load_data():
     if not os.path.exists(DATA_FILE):
-        return {}
-    with open(DATA_FILE, "r") as f:
+        with open(DATA_FILE, "w", encoding="utf-8") as f:
+            json.dump({}, f)
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
 
 def get_user_data(data, user_id):
     user_id = str(user_id)
