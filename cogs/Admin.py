@@ -13,7 +13,7 @@ ALLOWED_ROLES = [
 ]
 
 # --- أسماء رتب السجن والتحذيرات ---
-PRISON_ROLE_NAME = "Prison"  # اسم رتبة السجن
+PRISON_ROLE_NAME = "Prison"
 
 WARN_ROLE_1_NAME = "تحذير 1"
 WARN_ROLE_2_NAME = "تحذير 2"
@@ -76,11 +76,10 @@ class Admin(commands.Cog):
 
     try:
       if r3 in member.roles:
-        await interaction.followup.send(
+        return await interaction.followup.send(
             f"⚠️ العضو {member.mention} لديه بالفعل **تحذير 3** (الحد الأقصى).",
             ephemeral=True,
         )
-        return
       elif r2 in member.roles:
         await member.remove_roles(r2)
         await member.add_roles(r3)
@@ -379,14 +378,20 @@ class Admin(commands.Cog):
           if entry.action == discord.AuditLogAction.kick:
             embed.add_field(
                 name="🦵 طرد (Kick)",
-                value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}",
+                value=(
+                    f"المسؤول: {entry.user.mention}\nالسبب:"
+                    f" {entry.reason or 'لا يوجد'}"
+                ),
                 inline=False,
             )
             actions_found += 1
           elif entry.action == discord.AuditLogAction.ban:
             embed.add_field(
                 name="🔨 حظر (Ban)",
-                value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}",
+                value=(
+                    f"المسؤول: {entry.user.mention}\nالسبب:"
+                    f" {entry.reason or 'لا يوجد'}"
+                ),
                 inline=False,
             )
             actions_found += 1
@@ -396,7 +401,10 @@ class Admin(commands.Cog):
             ):
               embed.add_field(
                   name="🔇 تايم أوت (Timeout)",
-                  value=f"المسؤول: {entry.user.mention}\nالسبب: {entry.reason or 'لا يوجد'}",
+                  value=(
+                      f"المسؤول: {entry.user.mention}\nالسبب:"
+                      f" {entry.reason or 'لا يوجد'}"
+                  ),
                   inline=False,
               )
               actions_found += 1
