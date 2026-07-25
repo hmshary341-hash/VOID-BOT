@@ -1,8 +1,8 @@
-import random
+import time
 import discord
 from discord.ext import commands
 
-# --- قاموس الردود الملكعة والزاحفة الموسع جداً ---
+# --- قاموس الردود الملكعة والزاحفة ---
 AUTO_RESPONSES = {
     "احبك/ي": "عشتو! من حبك عاد؟ بلا رومانسية زايدة وخل عنك الهروج 😂",
     "منور/ة": "الروم منور بوجودي طبعاً، أنت وينك ضايع؟ 😎",
@@ -42,6 +42,7 @@ AUTO_RESPONSES = {
 class AutoReply(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.cooldowns = {}  # لتخزين وقت آخر رد لكل كلمة مفتاحية
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -49,6 +50,8 @@ class AutoReply(commands.Cog):
             return
 
         user_message = message.content.strip()
+        current_time = time.time()
+        COOLDOWN_TIME = 120  # الوقت بالثواني (120 ثانية = دقيقتين)
 
         for keyword, response in AUTO_RESPONSES.items():
             if "/" in keyword:
@@ -58,6 +61,15 @@ class AutoReply(commands.Cog):
                 variations = [keyword]
 
             if any(v in user_message for v in variations):
+                # التحقق من التايمر للكلمة
+                last_time = self.cooldowns.get(keyword, 0)
+                if current_time - last_time < COOLDOWN_TIME:
+                    # إذا ما خلصت الدقيقتين، يتجاهل الرد ولا يسوي سبام
+                    break
+
+                # تحديث وقت آخر استخدام للكلمة
+                self.cooldowns[keyword] = current_time
+                
                 await message.reply(response)
                 break
 
