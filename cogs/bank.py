@@ -10,7 +10,6 @@ os.makedirs("/app/data", exist_ok=True)
 DATA_FILE = "/app/data/economy.json"
 
 ROLE_ID = 1529995977203777566
-OWNER_ID = 123456789012345678  # استبدل هذا الرقم بالآي دي (ID) الخاص بك
 BANK_CHANNEL_ID = 1530413677222564062  # آي دي روم البنك المسموح فيه الأوامر
 
 def load_data():
@@ -232,13 +231,15 @@ class Bank(commands.Cog):
             ephemeral=True
         )
 
-    @app_commands.command(name="add_coins", description="أمر خاص بك لإضافة كوينز لأي شخص تحديداً")
+    @app_commands.command(name="add_coins", description="أمر خاص بمالك السيرفر لإضافة كوينز لأي شخص")
     @app_commands.describe(member="العضو المراد إعطاؤه الكوينز", amount="عدد الكوينز المراد إضافتها")
     async def add_coins(self, interaction: discord.Interaction, member: discord.Member, amount: int):
         if not await self.check_channel(interaction):
             return
-        if interaction.user.id != OWNER_ID:
-            await interaction.response.send_message("❌ هذا الأمر مخصص لك وحدك!", ephemeral=True)
+        
+        # السماح لمالك السيرفر فقط باستخدام الأمر
+        if interaction.user.id != interaction.guild.owner_id:
+            await interaction.response.send_message("❌ هذا الأمر مخصص لمالك السيرفر وحدك!", ephemeral=True)
             return
 
         if amount <= 0:
