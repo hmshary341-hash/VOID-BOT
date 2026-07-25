@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 import json
 import os
+import asyncio
 
 # --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات ---
 DATA_DIR = "/app/data"
@@ -105,9 +106,17 @@ class PurchaseSelect(discord.ui.Select):
         if role_given:
             msg += "\n✨ تم منحك الرتبة تلقائياً!"
         else:
-            msg += "\n📌 تم خصم المبلغ، يجدر بالإدارة تسليمك طلبك الآن."
+            msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
 
+        # الرد على المستخدم
         await interaction.response.send_message(msg, ephemeral=False)
+
+        # الانتظار لمدة 5 ثوانٍ ثم حذف روم التذكرة تلقائياً
+        await asyncio.sleep(5)
+        try:
+            await interaction.channel.delete()
+        except Exception as e:
+            print(f"❌ خطأ في حذف روم التذكرة: {e}")
 
 class PurchaseView(discord.ui.View):
     def __init__(self, shop_type: str):
@@ -154,8 +163,9 @@ class StoreView(discord.ui.View):
             )
         }
 
+        # اسم الروم أصبح باسم المتجر فقط بدون اسم المستخدم
         channel = await guild.create_text_channel(
-            name=f"{store_name}-{user.name}",
+            name=store_name,
             category=category,
             overwrites=overwrites
         )
