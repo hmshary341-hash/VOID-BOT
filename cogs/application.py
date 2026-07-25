@@ -11,21 +11,18 @@ ADMIN_ROLE_IDS = [
 ]  # الرتب المسموح لها بقبول/رفض التقديمات
 
 class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم الإدارة الرسمي"):
-    # الخانة 1 (تدمج السؤال 1 و 2)
     q1_q2 = discord.ui.TextInput(
         label="1 & 2. الاسم داخل ديسكورد + العمر",
         placeholder="مثال: Feras | العمر: 19 سنة",
         max_length=100
     )
     
-    # الخانة 2 (تدمج السؤال 3 و 4)
     q3_q4 = discord.ui.TextInput(
         label="3 & 4. ساعات التواجد + الخبرات السابقة",
         placeholder="التواجد: 6 ساعات | الخبرات: كنت مشرف في سيرفر...",
         max_length=200
     )
     
-    # الخانة 3 (السؤال 5)
     q5 = discord.ui.TextInput(
         label="5. ليش تبي تنضم للإدارة؟",
         placeholder="اكتب أسبابك ورغبتك في مساعدة السيرفر...",
@@ -33,7 +30,6 @@ class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم ال�
         max_length=300
     )
     
-    # الخانة 4 (تدمج السؤال 6 و 7)
     q6_q7 = discord.ui.TextInput(
         label="6. عضو سبّ؟ | 7. إداري خالف القوانين؟",
         placeholder="عضو: أعطيه تنبيه ثم ميوت... / إداري: أصوّر وأبلغ الإدارة العليا",
@@ -41,7 +37,6 @@ class ApplicationModal(discord.ui.Modal, title="📋 نموذج تقديم ال�
         max_length=300
     )
     
-    # الخانة 5 (تدمج السؤال 8 و 9)
     q8_q9 = discord.ui.TextInput(
         label="8. معرفة البوتات + 9. هل قرأت القوانين (نعم/لا)",
         placeholder="البوتات: ميراك، بروتك, الخ... / قرأت القوانين: نعم وألتزم بها",
@@ -82,7 +77,7 @@ class ApplyView(discord.ui.View):
         await interaction.response.send_modal(ApplicationModal())
 
 class ReviewView(discord.ui.View):
-    def __init__(self, applicant: discord.Member):
+    def __init__(self, applicant: discord.Member = None):
         super().__init__(timeout=None)
         self.applicant = applicant
 
@@ -102,10 +97,21 @@ class ReviewView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"تم قبول التقديم بنجاح.", ephemeral=True)
         
-        try:
-            await self.applicant.send(f"🎉 مبارك! تم قبول تقديمك الإداري في السيرفر. تواصل مع الإدارة لاستلام مهامك.")
-        except:
-            pass
+        # محاولة إرسال رسالة للمتقدم إذا كان مخزناً، أو جلبه من الـ Embed
+        applicant = self.applicant
+        if not applicant:
+            try:
+                footer_text = embed.footer.text  # ID: 123456789
+                user_id = int(footer_text.split(": ")[1])
+                applicant = interaction.guild.get_member(user_id)
+            except:
+                pass
+
+        if applicant:
+            try:
+                await applicant.send(f"🎉 مبارك! تم قبول تقديمك الإداري في السيرفر. تواصل مع الإدارة لاستلام مهامك.")
+            except:
+                pass
 
     @discord.ui.button(label="رفض ❌", style=discord.ButtonStyle.danger, custom_id="reject_apply_v3")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -123,10 +129,20 @@ class ReviewView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"تم رفض التقديم.", ephemeral=True)
 
-        try:
-            await self.applicant.send(f"عذراً، لم يتم قبول تقديمك الإداري هذه المرة. نتمنى لك حظاً أوفر في المرات القادمة.")
-        except:
-            pass
+        applicant = self.applicant
+        if not applicant:
+            try:
+                footer_text = embed.footer.text
+                user_id = int(footer_text.split(": ")[1])
+                applicant = interaction.guild.get_member(user_id)
+            except:
+                pass
+
+        if applicant:
+            try:
+                await applicant.send(f"عذراً، لم يتم قبول تقديمك الإداري هذه المرة. نتمنى لك حظاً أوفر في المرات القادمة.")
+            except:
+                pass
 
 class ApplicationCog(commands.Cog):
     def __init__(self, bot):
