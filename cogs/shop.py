@@ -10,17 +10,18 @@ DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "economy.json")
 
-# --- أسعار وأتمتة المنتجات ---
+# --- أسعار وأتمتة المنتجات والآي ديَات المحدثة ---
 ROLES_SHOP = {
-    "ultra": {"name": "Ultra", "price": 75000, "role_id": 0},  # ضع آي دي رتبة Ultra هنا
-    "prime": {"name": "Prime", "price": 45000, "role_id": 0},  # ضع آي دي رتبة Prime هنا
-    "plus": {"name": "Plus", "price": 25000, "role_id": 0},    # ضع آي دي رتبة Plus هنا
-    "basic": {"name": "Basic", "price": 10000, "role_id": 0}   # ضع آي دي رتبة Basic هنا
+    "ultra": {"name": "Ultra", "price": 75000, "role_id": 1530402702914490420},
+    "premio": {"name": "Premio", "price": 55000, "role_id": 1530404996451930153},
+    "prime": {"name": "Prime", "price": 45000, "role_id": 1530398293732102286},
+    "plus": {"name": "Plus", "price": 25000, "role_id": 1530397307206631605},
+    "basic": {"name": "Basic", "price": 10000, "role_id": 1530396937587523595}
 }
 
 TITLES_SHOP = {
-    "king": {"name": "King", "price": 60000, "role_id": 0},    # ضع آي دي رتبة King هنا
-    "queen": {"name": "Queen", "price": 60000, "role_id": 0}   # ضع آي دي رتبة Queen هنا
+    "king": {"name": "King", "price": 60000, "role_id": 1530407131507986554},
+    "queen": {"name": "Queen", "price": 60000, "role_id": 1530407411335172188}
 }
 
 def load_data():
@@ -91,7 +92,7 @@ class PurchaseSelect(discord.ui.Select):
         # خصم الكوينز وحفظها في الفوليوم
         deduct_user_coins(interaction.user.id, price)
 
-        # محاولة إعطاء الرتبة إن وجد آي دي لها
+        # محاولة إعطاء الرتبة تلقائياً
         role_given = False
         if item["role_id"] != 0:
             role = interaction.guild.get_role(item["role_id"])
@@ -104,7 +105,7 @@ class PurchaseSelect(discord.ui.Select):
 
         msg = f"🎉 مبروك! لقد اشتريت **{item['name']}** بنجاح مقابل **{price:,} كوينز**."
         if role_given:
-            msg += "\n✨ تم منحك الرتبة تلقائياً!"
+            msg += "\n✨ تم منحك الرتبة تلقائياً وسيتم حذف التذكرة..."
         else:
             msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
 
@@ -180,6 +181,7 @@ class StoreView(discord.ui.View):
                 f"أهلاً بك يا {user.mention} في **متجر الرتب**!\n"
                 "إليك قائمة الرتب المتاحة للشراء:\n\n"
                 "🔥 **Ultra** - السعر: 75,000 كوينز\n"
+                "💎 **Premio** - السعر: 55,000 كوينز\n"
                 "🔹 **Prime** - السعر: 45,000 كوينز\n"
                 "🌟 **Plus** - السعر: 25,000 كوينز\n"
                 "⭐ **Basic** - السعر: 10,000 كوينز\n\n"
