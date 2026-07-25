@@ -46,18 +46,25 @@ class VacationModal(discord.ui.Modal, title="نموذج طلب إجازة"):
         else:
             await interaction.response.send_message("❌ عذراً، لم يتم العثور على روم استقبال الطلبات!", ephemeral=True)
 
+class VacationButtonView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="تقديم طلب إجازة", style=discord.ButtonStyle.primary, custom_id="open_vacation_modal", emoji="📋")
+    async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(VacationModal())
+
 class VacationAdminView(discord.ui.View):
     def __init__(self, user_id: int):
-        super().__init__(timeout=None)
+        super().__init__(timeout=180)
         self.user_id = user_id
 
     def check_permissions(self, interaction: discord.Interaction):
-        # السماح لمن يمتلك إحدى رتب الإدارة المحددة أو صلاحية إدارة السيرفر
         if interaction.user.guild_permissions.manage_guild:
             return True
         return any(role.id in ADMIN_ROLE_IDS for role in interaction.user.roles)
 
-    @discord.ui.button(label="قبول", style=discord.ButtonStyle.success, custom_id="accept_vacation")
+    @discord.ui.button(label="قبول", style=discord.ButtonStyle.success, custom_id="accept_vacation_btn")
     async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.check_permissions(interaction):
             await interaction.response.send_message("❌ ليس لديك الصلاحية للرد على الطلبات!", ephemeral=True)
@@ -80,7 +87,7 @@ class VacationAdminView(discord.ui.View):
         except:
             pass
 
-    @discord.ui.button(label="رفض", style=discord.ButtonStyle.danger, custom_id="reject_vacation")
+    @discord.ui.button(label="رفض", style=discord.ButtonStyle.danger, custom_id="reject_vacation_btn")
     async def reject(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.check_permissions(interaction):
             await interaction.response.send_message("❌ ليس لديك الصلاحية للرد على الطلبات!", ephemeral=True)
@@ -107,14 +114,27 @@ class Vacation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="vacation", description="تقديم طلب إجازة جديد للإدارة")
-    async def vacation(self, interaction: discord.Interaction):
-        # التحقق من استخدام الأمر في الروم المخصص فقط
-        if interaction.channel.id != VACATION_CHANNEL_ID:
-            await interaction.response.send_message("❌ يمكنك استخدام هذا الأمر فقط في روم طلبات الإجازة المخصص!", ephemeral=True)
+    def cog_load(self):
+        # تسجيل الزر ليبقى يعمل بشكل دائم حتى بعد إعادة تشغيل البوت
+        self.bot.add_view(VacationButtonView())
+
+    @app_commands.command(name="setup_vacation", description="إرسال رسالة تقديم طلبات الإجازة مع زر التقديم")
+    @app_commands.checks.has_permissions(manage_guild=True)
+    async def setup_vacation(self, interaction: discord.Interaction):
+        channel = interaction.guild.get_channel(VACATION_CHANNEL_ID)
+        if not channel:
+            await interaction.response.send_message("❌ لم يتم العثور على روم تقديم الطلبات المحدد!", ephemeral=True)
             return
-            
-        await interaction.response.send_modal(VacationModal())
+
+        embed = discord.Embed(
+            title="🏖️ نظام طلبات الإجازات",
+            description="اضغط على الزر بالأسفل لفتح نموذج تقديم طلب إجازة جديد.",
+            color=discord.Color.blue()
+        )
+        
+        view = VacationButtonView()
+        await channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ تم إرسال رسالة الأزرار بنجاح إلى الروم المحدد!", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Vacation(bot))
