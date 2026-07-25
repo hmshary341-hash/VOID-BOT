@@ -237,7 +237,6 @@ class Bank(commands.Cog):
         if not await self.check_channel(interaction):
             return
         
-        # السماح لمالك السيرفر فقط باستخدام الأمر
         if interaction.user.id != interaction.guild.owner_id:
             await interaction.response.send_message("❌ هذا الأمر مخصص لمالك السيرفر وحدك!", ephemeral=True)
             return
