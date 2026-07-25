@@ -12,18 +12,18 @@ GOODBYE_CHANNEL_ID = 1530301291182428250  # آي دي روم المغادرة
 WELCOME_IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530440858682265673/file_00000000393c81f4ae6ad623b7992a65.png?ex=6a65959e&is=6a64441e&hm=b86e603acee64fccf17340ebc03769b2e6f8aea895405a6120ddd3fc14bbc0d4&"
 GOODBYE_IMAGE_URL = "https://cdn.discordapp.com/attachments/1529890271582486660/1530441184357646537/file_000000000cf08246ade14eaafd6f1730.png?ex=6a6595ec&is=6a64446c&hm=986edbf06b770b47e04278620b02489aa35b81c2cc1a7513e8c8aff37096b9c6&"
 
-# --- إعدادات الترحيب (الإحداثيات والمقاسات) ---
-WELCOME_CIRCLE_COORDS = (65, 65)    # مكان الأفتار (موضع X و Y)
-WELCOME_CIRCLE_SIZE = 265           # حجم دائرة الأفتار
-WELCOME_TEXT_COORDS = (360, 150)    # مكان كتابة اسم المستخدم داخل الصورة (X و Y)
+# --- إعدادات الترحيب (تم ضبطها لتناسب التصميم بدقة) ---
+WELCOME_CIRCLE_COORDS = (45, 40)    # موضع الأفتار (X, Y) داخل الإطار
+WELCOME_CIRCLE_SIZE = 180           # حجم دائرة الأفتار
+WELCOME_TEXT_COORDS = (240, 100)    # موضع كتابة اسم المستخدم (X, Y)
 
-# --- إعدادات المغادرة (الإحداثيات والمقاسات) ---
-GOODBYE_CIRCLE_COORDS = (65, 65)    # مكان الأفتار (موضع X و Y)
-GOODBYE_CIRCLE_SIZE = 265           # حجم دائرة الأفتار
-GOODBYE_TEXT_COORDS = (360, 150)    # مكان كتابة اسم المستخدم داخل الصورة (X و Y)
+# --- إعدادات المغادرة ---
+GOODBYE_CIRCLE_COORDS = (45, 40)    # موضع الأفتار (X, Y) داخل الإطار
+GOODBYE_CIRCLE_SIZE = 180           # حجم دائرة الأفتار
+GOODBYE_TEXT_COORDS = (240, 100)    # موضع كتابة اسم المستخدم (X, Y)
 
 async def create_custom_card(member, bg_url, circle_coords, circle_size, text_to_draw, text_coords):
-    """وظيفة لدمج صورة بروفايل العضو وكتابة اسمه داخل التصميم"""
+    """وظيفة لدمج صورة بروفايل العضو وكتابة اسمه داخل التصميم بدقة"""
     try:
         async with aiohttp.ClientSession() as session:
             # تحميل صورة الخلفية
@@ -41,7 +41,7 @@ async def create_custom_card(member, bg_url, circle_coords, circle_size, text_to
         bg = Image.open(BytesIO(bg_data)).convert("RGBA")
         avatar = Image.open(BytesIO(avatar_data)).convert("RGBA")
 
-        # تغيير حجم الأفتار ليطابق حجم الدائرة
+        # تغيير حجم الأفتار ليطابق الإطار
         avatar = avatar.resize((circle_size, circle_size), Image.Resampling.LANCZOS)
 
         # إنشاء قناع دائري لقص الصورة
@@ -55,7 +55,7 @@ async def create_custom_card(member, bg_url, circle_coords, circle_size, text_to
         # كتابة اسم المستخدم على الصورة
         draw = ImageDraw.Draw(bg)
         try:
-            font = ImageFont.truetype("arial.ttf", 45)
+            font = ImageFont.truetype("arial.ttf", 38)
         except IOError:
             font = ImageFont.load_default()
 
