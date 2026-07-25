@@ -8,10 +8,9 @@ from cogs.shop import StoreView
 # إعداد الصلاحيات (Intents)
 intents = discord.Intents.all()
 
-# تعريف البوت وتغيير بادئة الأوامر إلى -
+# تعريف البوت مع بادئة الأوامر -
 bot = commands.Bot(command_prefix="-", intents=intents)
 
-# إضافة حدث on_ready (يتم تنفيذه عند تشغيل البوت)
 @bot.event
 async def on_ready():
     # تسجيل الـ Views في ذاكرة البوت لتكون مستمرة (Persistent)
