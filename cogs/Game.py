@@ -1,131 +1,540 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
 import random
-import asyncio
 import json
 import os
+import asyncio
 
-DATA_FILE = "xp_data.json"
-QUESTIONS_CHANNEL_ID = 1525971090705219654  # روم الأسئلة
+DATA_FILE = "economy.json"
 
-# قائمة ضخمة من الأسئلة النظيفة والممتعة
-CLEAN_QUESTIONS = [
-    "لو ملكت القوة لتغيير شيء واحد في العالم، ماذا ستغير؟",
-    "ما هو حلم الطفولة الذي تمنيت تحقيقه دائماً؟",
-    "لو اضطررت للعيش في عصر تاريخي آخر، أي عصر ستختار ولماذا؟",
-    "ما هي أفضل نصيحة تلقيتها في حياتك؟",
-    "لو كسبت مليون دولار الآن، ما أول شيء ستشتريه؟",
-    "ما هي المهارة التي تود تعلمها لو كان لديك الوقت الكافي؟",
-    "ما هو المكان الأكثر هدوءاً وراحة بالنسبة لك؟",
-    "لو كتب لك أن تعيش يومك الأخير، كيف ستضيه؟",
-    "ما هو أكثر شيء تفتخر به في حياتك حتى الآن؟",
-    "لو كان بإمكانك السفر لأي مكان في العالم الآن، إلى أين ستذهب؟",
-    "ما هي الكتاب أو القصة التي أثرت في شخصيتك بشكل كبير؟",
-    "لو استطعت اختراع جهاز يسهل حياة الناس، ماذا سيكون؟",
-    "ما هي الصفة التي تحبها أكثر في نفسك؟",
-    "لو خيروك أن تعيش في مدينة ساحلية أو مدينة جبلية، ماذا تختار؟",
-    "ما هو أكثر موقف مضحك تعرضت له في حياتك؟",
-    "لو كان بإمكانك تناول طعام واحد فقط بقية حياتك، ماذا ستختار؟",
-    "ما هي الهواية التي تمارسها لتفريغ طاقتك السلبية؟",
-    "لو أتيحت لك الفرصة لمقابلة شخصية تاريخية، من ستختار؟",
-    "ما هو الهدف الأساسي الذي تسعى لتحقيقه هذا العام؟",
-    "لو طُلب منك إلقاء خطبة أمام العالم كله في دقيقة واحدة، ماذا ستكون رسالتك؟",
-    "ما هو الشيء البسيط الذي يجعلك سعيداً فوراً؟",
-    "لو كان بإمكانك العودة بالزمني لتغيير قرار واحد، هل ستفعل؟",
-    "ما هي أجمل رسالة أو كلمة سمعتها من شخص غريب؟",
-    "لو فتحت مشروعك الخاص اليوم، في أي مجال سيكون؟",
-    "ما هو الفيلم أو المسلسل الذي لا تمل من إعادة مشاهدته؟",
-    "لو طُلب منك وصف نفسك في ثلاث كلمات، ماذا ستختار؟",
-    "ما هي العادة الجديدة التي تتمنى اكتسابها؟",
-    "لو كان اليوم بأكمله مجاناً وبدون مسؤوليات، كيف ستستغله؟",
-    "ما هو المشروب المفضل لديك أثناء العمل أو الدراسة؟",
-    "لو استطاعت التحدث بلغة الحيوانات، أي حيوان ستبدأ محادثته؟",
-    "ما هو المكان الذي تذهب إليه عندما تريد الاختلاء بنفسك؟",
-    "لو كان بإمكانك العيش داخل عالم خيالي (أنمي، ألعاب، أفلام)، أين ستستقر؟",
-    "ما هي أقيم هدية تلقيتها في حياتك؟",
-    "لو خيروك بين الذكاء الخارق أو السعادة الدائمة، ماذا تختار؟",
-    "ما هو الصوت الذي يمنحك شعوراً بالراحة والسلام؟",
-    "لو أصبحت رئيساً لدولة ليوم واحد، ما أول قرار ستتخذه؟",
-    "ما هي أفضل مهارة تجيدها في حياتك اليومية؟",
-    "لو كان لديك وقت فراغ غير محدود، كيف ستنقضي يومك؟",
-    "ما هو الفصل المفضل لديك في السنة ولماذا؟",
-    "لو استطعت السفر عبر المستقبل 100 سنة، ماذا تتمنى أن ترى؟",
-    "ما هو التحدي الصعب الذي تجاوزته وفخور به؟",
-    "لو طُلب منك تدريس مادة للأطفال، ماذا ستكون؟",
-    "ما هي العبارة أو الحكمة التي تكررها دائماً لنفسك؟",
-    "لو كنت شخصية كرتونية، من تتمنى أن تكون؟",
-    "ما هو الشيء الذي تفعله دائماً عندما تشعر بالملل؟",
-    "لو أتيحت لك الفرصة لتصميم ديكور غرفتك من جديد، كيف ستكون؟",
-    "ما هو أكثر لون تشعر أنه يمثل شخصيتك؟",
-    "لو كان بإمكانك تعلم لغة جديدة فوراً، أي لغة ستختار؟",
-    "ما هو أجمل شعور مررت به في حياتك؟",
-    "لو طُلب منك تلخيص حياتك في جملة واحدة، ماذا ستكون؟"
-]
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        return {}
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
-class Game(commands.Cog):
+def save_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4, ensure_ascii=False)
+
+def get_user_data(data, user_id):
+    user_id = str(user_id)
+    if user_id not in data:
+        data[user_id] = {
+            "coins": 0, "daily_transferred": 0, "last_date": "", 
+            "last_daily_date": "", "last_work_date": "", "nerd_count": 0, 
+            "last_nerd_date": "", "mafia_wins": 0, "citizen_wins": 0
+        }
+    elif isinstance(data[user_id], int):
+        old = data[user_id]
+        data[user_id] = {
+            "coins": old, "daily_transferred": 0, "last_date": "", 
+            "last_daily_date": "", "last_work_date": "", "nerd_count": 0, 
+            "last_nerd_date": "", "mafia_wins": 0, "citizen_wins": 0
+        }
+    else:
+        if "mafia_wins" not in data[user_id]:
+            data[user_id]["mafia_wins"] = 0
+        if "citizen_wins" not in data[user_id]:
+            data[user_id]["citizen_wins"] = 0
+    return data[user_id]
+
+def normalize_arabic(text):
+    if not text:
+        return ""
+    text = text.strip()
+    for char in ['أ', 'إ', 'آ']:
+        text = text.replace(char, 'ا')
+    return text
+
+# ==========================================
+# نظام لعبة المافيا
+# ==========================================
+class PlayerSelect(discord.ui.Select):
+    def __init__(self, players, placeholder, callback_func):
+        options = [discord.SelectOption(label=p.name, value=str(p.id)) for p in players]
+        super().__init__(placeholder=placeholder, min_values=1, max_values=1, options=options)
+        self.custom_callback = callback_func
+
+    async def callback(self, interaction: discord.Interaction):
+        await self.custom_callback(interaction, self.values[0])
+
+class PlayerSelectView(discord.ui.View):
+    def __init__(self, players, placeholder, callback_func):
+        super().__init__(timeout=30)
+        self.add_item(PlayerSelect(players, placeholder, callback_func))
+
+class MafiaView(discord.ui.View):
+    def __init__(self, host_id):
+        super().__init__(timeout=300)
+        self.host_id = host_id
+        self.players = []
+        self.roles = {}
+        self.game_started = False
+        self.mafia_users = []
+        self.non_mafia_users = []
+        self.doctor_user = None
+        self.detective_user = None
+
+    @discord.ui.button(label="دخول اللعبة 🎮", style=discord.ButtonStyle.green, custom_id="mafia_join")
+    async def join_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.game_started:
+            await interaction.response.send_message("❌ لقد بدأت اللعبة بالفعل!", ephemeral=True)
+            return
+        if interaction.user in self.players:
+            await interaction.response.send_message("⚠️ أنت منضم بالفعل في اللعبة!", ephemeral=True)
+            return
+
+        self.players.append(interaction.user)
+        player_list = "\n".join([p.mention for p in self.players])
+        embed = interaction.message.embeds[0]
+        embed.description = f"**اللاعبون المنضمون ({len(self.players)}):**\n{player_list}"
+        await interaction.message.edit(embed=embed)
+        await interaction.response.send_message("✅ تم انضمامك إلى لعبة المافيا بنجاح!", ephemeral=True)
+
+    @discord.ui.button(label="خروج من اللعبة 🚪", style=discord.ButtonStyle.danger, custom_id="mafia_leave")
+    async def leave_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.game_started:
+            await interaction.response.send_message("❌ لا يمكنك الخروج بعد بدء اللعبة!", ephemeral=True)
+            return
+        if interaction.user not in self.players:
+            await interaction.response.send_message("⚠️ أنت لست منضماً في اللعبة أساساً!", ephemeral=True)
+            return
+
+        self.players.remove(interaction.user)
+        player_list = "\n".join([p.mention for p in self.players]) if self.players else "لا يوجد لاعبون منضمون حالياً."
+        embed = interaction.message.embeds[0]
+        embed.description = f"**اللاعبون المنضمون ({len(self.players)}):**\n{player_list}"
+        await interaction.message.edit(embed=embed)
+        await interaction.response.send_message("✅ تم خروجك من لعبة المافيا بنجاح.", ephemeral=True)
+
+    @discord.ui.button(label="بدء اللعبة 🚀", style=discord.ButtonStyle.primary, custom_id="mafia_start")
+    async def start_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ فقط من بدأ الأمر أو الإدارة يستطيع بدء اللعبة!", ephemeral=True)
+            return
+        if self.game_started:
+            await interaction.response.send_message("❌ اللعبة بدأت بالفعل!", ephemeral=True)
+            return
+        if len(self.players) <= 3:
+            await interaction.response.send_message("❌ ممنوع لعب المافيا إذا كان عدد اللاعبين 3 أو أقل!", ephemeral=True)
+            return
+
+        self.game_started = True
+        shuffled_players = self.players.copy()
+        random.shuffle(shuffled_players)
+        num_players = len(shuffled_players)
+        
+        if num_players >= 8:
+            mafia_count = 2
+            doctor_count = 1
+            detective_count = 1
+        else:
+            mafia_count = 1
+            doctor_count = 1
+            detective_count = 0
+
+        self.mafia_users = []
+        self.non_mafia_users = []
+        
+        for _ in range(mafia_count):
+            user = shuffled_players.pop()
+            self.roles[user.id] = "مافيا 🦹‍♂️"
+            self.mafia_users.append(user)
+        
+        for _ in range(doctor_count):
+            if shuffled_players:
+                user = shuffled_players.pop()
+                self.roles[user.id] = "طبيب 🩺"
+                self.doctor_user = user
+                self.non_mafia_users.append(user)
+                
+        if detective_count > 0 and shuffled_players:
+            user = shuffled_players.pop()
+            self.roles[user.id] = "محقق 🔍"
+            self.detective_user = user
+            self.non_mafia_users.append(user)
+
+        while shuffled_players:
+            user = shuffled_players.pop()
+            self.roles[user.id] = "مواطن 👤"
+            self.non_mafia_users.append(user)
+
+        reveal_view = MafiaControlView(self.roles, self.mafia_users, self.non_mafia_users, self.doctor_user, self.detective_user, self.players, self.host_id)
+        
+        embed = discord.Embed(
+            title="🎮 بدأت لعبة المافيا بنجاح!",
+            description="تم توزيع الأدوار.\n- اضغط على زر **اكشف دورك السري** لمعرفة دورك.\n- زر **ابدأ الليل 🌙** لبدء جولة الأفعال الليلية.\n- زر **تصويت طرد 🗳️** لطرد المشكوك فيهم بالنهار.",
+            color=discord.Color.dark_red()
+        )
+        await interaction.message.edit(embed=embed, view=reveal_view)
+        await interaction.response.send_message("🚀 بدأت اللعبة وتم إرسال الأدوار للأعضاء عبر الأزرار!", ephemeral=True)
+
+class MafiaControlView(discord.ui.View):
+    def __init__(self, roles, mafia_users, non_mafia_users, doctor_user, detective_user, players, host_id):
+        super().__init__(timeout=None)
+        self.roles = roles
+        self.mafia_users = mafia_users
+        self.non_mafia_users = non_mafia_users
+        self.doctor_user = doctor_user
+        self.detective_user = detective_user
+        self.players = players
+        self.host_id = host_id
+        
+        self.mafia_choices = {}
+        self.doctor_choice = None
+        self.total_mafia_count = len(self.mafia_users)
+        self.eliminated_mafia_count = 0
+
+    @discord.ui.button(label="اكشف دورك السري 🕵️‍♂️", style=discord.ButtonStyle.secondary, custom_id="mafia_reveal")
+    async def reveal_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_id = interaction.user.id
+        if user_id not in self.roles:
+            await interaction.response.send_message("❌ أنت لست مشاركاً في هذه اللعبة!", ephemeral=True)
+            return
+        role = self.roles[user_id]
+        await interaction.response.send_message(f"🔒 دورك السري في اللعبة هو: **{role}**", ephemeral=True)
+
+    @discord.ui.button(label="ابدأ الليل 🌙", style=discord.ButtonStyle.danger, custom_id="start_night_btn")
+    async def start_night_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ هذا الزر مخصص لمنشئ اللعبة أو الإدارة فقط!", ephemeral=True)
+            return
+
+        await interaction.response.send_message("🌙 بدأ الليل! تم إرسال الأوامر الخاصة لكل دور بشكل سري.", ephemeral=True)
+
+        for player in self.players:
+            role = self.roles.get(player.id)
+            if "مافيا" in role:
+                async def mafia_action(inter, target_id):
+                    self.mafia_choices[inter.user.id] = int(target_id)
+                    target_name = discord.utils.get(self.players, id=int(target_id)).name
+                    await inter.response.send_message(f"🔪 لقد اخترت قتل: **{target_name}**", ephemeral=True)
+
+                view = PlayerSelectView(self.players, "اختر من تقتل (خاص بالمافيا)", mafia_action)
+                try:
+                    await player.send("🔪 **الليل وصل:** بصفتك مافيا، اختر من تقتل هذه الليلة (أمامك 30 ثانية):", view=view)
+                except:
+                    pass
+
+            elif "طبيب" in role:
+                async def doctor_action(inter, target_id):
+                    self.doctor_choice = int(target_id)
+                    target_name = discord.utils.get(self.players, id=int(target_id)).name
+                    await inter.response.send_message(f"🩺 لقد اخترت حماية: **{target_name}**", ephemeral=True)
+
+                view = PlayerSelectView(self.players, "اختر من تحمي (نفسك أو غيرك)", doctor_action)
+                try:
+                    await player.send("🩺 **الليل وصل:** بصفتك طبيب، اختر من تحمي هذه الليلة:", view=view)
+                except:
+                    pass
+
+            elif "محقق" in role:
+                async def detective_action(inter, target_id):
+                    target_id_int = int(target_id)
+                    target_member = discord.utils.get(self.players, id=target_id_int)
+                    target_role = self.roles.get(target_id_int, "مواطن")
+                    if "مافيا" in target_role:
+                        msg = f"🔍 كشفت **{target_member.name}**...\nأبك أبك هذا مافيا 🦹‍♂️🔥!"
+                    else:
+                        msg = f"🔍 كشفت **{target_member.name}**...\nهذا مو مافيا، الدكتور الحلو 🩺✨."
+                    await inter.response.send_message(msg, ephemeral=True)
+
+                view = PlayerSelectView(self.players, "اختر من تريد الكشف عنه", detective_action)
+                try:
+                    await player.send("🔍 **الليل وصل:** بصفتك محقق، اختر شخصاً لتكشف هويته:", view=view)
+                except:
+                    pass
+
+        await asyncio.sleep(30)
+
+        target_to_kill = None
+        if self.mafia_choices:
+            choices_list = list(self.mafia_choices.values())
+            target_to_kill = random.choice(choices_list)
+        else:
+            target_to_kill = random.choice(self.players).id
+
+        if target_to_kill == self.doctor_choice:
+            await interaction.channel.send("🛡️ **شقكم الدكتور وما قتلتوه!** (لم يمت أحد هذه الليلة بفضل حماية الطبيب).")
+        else:
+            dead_player = discord.utils.get(self.players, id=target_to_kill)
+            if dead_player:
+                await interaction.channel.send(f"💀 **عسير!** لقد تم قتل اللاعب **{dead_player.mention}** هذه الليلة من قِبل المافيا!")
+
+    @discord.ui.button(label="تصويت طرد 🗳️", style=discord.ButtonStyle.primary, custom_id="vote_kick_btn")
+    async def vote_kick_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ هذا الزر مخصص لمنشئ اللعبة أو الإدارة فقط!", ephemeral=True)
+            return
+
+        async def kick_action(inter, target_id):
+            target_id_int = int(target_id)
+            target_member = discord.utils.get(self.players, id=target_id_int)
+            target_role = self.roles.get(target_id_int, "مواطن")
+
+            if "مافيا" in target_role:
+                self.eliminated_mafia_count += 1
+                count_str = f" {self.eliminated_mafia_count}/{self.total_mafia_count}" if self.total_mafia_count > 1 else ""
+                await inter.response.send_message(f"القم واعععععععععع تم طرد مافيا{count_str} 👞💥")
+            else:
+                await inter.response.send_message(f"😢 للأسف تم طرد اللاعب **{target_member.name}** لكنه طلع بريء ومو مافيا!")
+
+        view = PlayerSelectView(self.players, "اختر اللاعب المراد التصويت لطرده", kick_action)
+        await interaction.response.send_message("🗳️ **بدأ التصويت النهاري!** اختر الشخص المشكوك فيه لطرده:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="🏆 إعلان فوز المافيا", style=discord.ButtonStyle.danger, custom_id="mafia_win_btn")
+    async def mafia_win_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ هذا الزر مخصص لمنشئ اللعبة أو الإدارة فقط!", ephemeral=True)
+            return
+
+        data = load_data()
+        description = "🎉 **فاز فريق المافيا بالسيطرة على المدينة!**\n\n**أعضاء المافيا الفائزون:**\n"
+        for mafia in self.mafia_users:
+            u_data = get_user_data(data, mafia.id)
+            u_data["coins"] += 550
+            u_data["mafia_wins"] += 1
+            description += f"👤 **{mafia.name}** ({mafia.mention})\n📊 عدد مرات الفوز بالمافيا: **{u_data['mafia_wins']}**\n💰 الجائزة المضافة: **550 كوينز**\n\n"
+        save_data(data)
+
+        embed = discord.Embed(title="🏆 نهاية اللعبة - انتصار المافيا!", description=description, color=discord.Color.dark_red())
+        if self.mafia_users:
+            embed.set_thumbnail(url=self.mafia_users[0].display_avatar.url)
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.response.send_message("✅ تم إعلان فوز المافيا وتوزيع الجوائز بنجاح!", ephemeral=True)
+
+    @discord.ui.button(label="🏆 إعلان فوز المواطنين", style=discord.ButtonStyle.success, custom_id="citizen_win_btn")
+    async def citizen_win_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ هذا الزر مخصص لمنشئ اللعبة أو الإدارة فقط!", ephemeral=True)
+            return
+
+        data = load_data()
+        description = "🎉 **فاز فريق المواطنين والعدالة في المدينة!**\n\n**المواطنون الفائزون:**\n"
+        for citizen in self.non_mafia_users:
+            u_data = get_user_data(data, citizen.id)
+            u_data["coins"] += 550
+            u_data["citizen_wins"] += 1
+            role_name = self.roles.get(citizen.id, "مواطن 👤")
+            description += f"👤 **{citizen.name}** ({citizen.mention}) - [{role_name}]\n📊 عدد مرات فوز المواطنين: **{u_data['citizen_wins']}**\n💰 الجائزة المضافة: **550 كوينز**\n\n"
+        save_data(data)
+
+        embed = discord.Embed(title="🏆 نهاية اللعبة - انتصار المواطنين!", description=description, color=discord.Color.green())
+        if self.non_mafia_users:
+            embed.set_thumbnail(url=self.non_mafia_users[0].display_avatar.url)
+        for item in self.children:
+            item.disabled = True
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.response.send_message("✅ تم إعلان فوز المواطنين وتوزيع الجوائز بنجاح!", ephemeral=True)
+
+# ==========================================
+# نظام لعبة ربيكا (إنسان حيوان الجماعية)
+# ==========================================
+class RebeccaModal(discord.ui.Modal, title="لعبة إنسان حيوان مع ربيكا 💅"):
+    def __init__(self, letter, game_view):
+        super().__init__()
+        self.letter = letter
+        self.game_view = game_view
+
+        self.human = discord.ui.TextInput(label=f"إنسان بحرف ({letter})", placeholder="مثال: محمد", required=True, max_length=50)
+        self.animal = discord.ui.TextInput(label=f"حيوان بحرف ({letter})", placeholder="مثال: بطريق", required=True, max_length=50)
+        self.plant = discord.ui.TextInput(label=f"نبات بحرف ({letter})", placeholder="مثال: برتقال", required=True, max_length=50)
+        self.jamad = discord.ui.TextInput(label=f"جماد بحرف ({letter})", placeholder="مثال: باب", required=True, max_length=50)
+        self.country = discord.ui.TextInput(label=f"بلاد بحرف ({letter})", placeholder="مثال: بحرين", required=True, max_length=50)
+
+        self.add_item(self.human)
+        self.add_item(self.animal)
+        self.add_item(self.plant)
+        self.add_item(self.jamad)
+        self.add_item(self.country)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        user_id = interaction.user.id
+        if user_id in self.game_view.submitted_users:
+            await interaction.response.send_message("❌ لقد قمت بالمشاركة مسبقاً في هذه الجولة!", ephemeral=True)
+            return
+
+        h = self.human.value.strip()
+        a = self.animal.value.strip()
+        p = self.plant.value.strip()
+        j = self.jamad.value.strip()
+        c = self.country.value.strip()
+
+        norm_letter = normalize_arabic(self.letter)
+        score = 0
+        fields = [("إنسان", h), ("حيوان", a), ("نبات", p), ("جماد", j), ("بلاد", c)]
+
+        for name, val in fields:
+            norm_val = normalize_arabic(val)
+            if norm_val.startswith(norm_letter):
+                score += 10
+
+        reward = score * 20
+        if reward > 0:
+            data = load_data()
+            u_data = get_user_data(data, user_id)
+            u_data["coins"] = u_data.get("coins", 0) + reward
+            save_data(data)
+
+        self.game_view.scores[user_id] = {"name": interaction.user.name, "score": score, "reward": reward}
+        self.game_view.submitted_users.add(user_id)
+
+        await interaction.response.send_message(f"✅ تم تسجيل إجاباتك بنجاح!\nالنقاط: **{score}/50**\nالكوينز المكتسبة: **+{reward}** 💰", ephemeral=True)
+
+class RebeccaParticipateButton(discord.ui.Button):
+    def __init__(self, game_view):
+        super().__init__(label="شارك بكلماتك ✍️", style=discord.ButtonStyle.success, custom_id="rebecca_part")
+        self.game_view = game_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user not in self.game_view.players:
+            await interaction.response.send_message("❌ أنت لست من المشاركين الأساسيين في هذه اللعبة!", ephemeral=True)
+            return
+        if interaction.user.id in self.game_view.submitted_users:
+            await interaction.response.send_message("⚠️ لقد شاركت بالفعل في هذه الجولة!", ephemeral=True)
+            return
+        await interaction.response.send_modal(RebeccaModal(self.game_view.chosen_letter, self.game_view))
+
+class RebeccaEndButton(discord.ui.Button):
+    def __init__(self, game_view):
+        super().__init__(label="إنهاء وإعلان النتائج 📊", style=discord.ButtonStyle.danger, custom_id="rebecca_end")
+        self.game_view = game_view
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.game_view.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ فقط منظم اللعبة يستطيع إنهاءها!", ephemeral=True)
+            return
+
+        desc = f"📊 **نتائج جولة ربيكا (الحرف: {self.game_view.chosen_letter})**\n\n"
+        if self.game_view.scores:
+            sorted_scores = sorted(self.game_view.scores.values(), key=lambda x: x["score"], reverse=True)
+            for i, data in enumerate(sorted_scores, 1):
+                desc += f"{i}. **{data['name']}** - النقاط: {data['score']}/50 | الكوينز: +{data['reward']} 💰\n"
+        else:
+            desc += "محد شارك يا كسالى! ربيكا زعلانة منكم 🙄💅"
+
+        embed = discord.Embed(title="🏆 نهاية اللعبة - نتائج ربيكا", description=desc, color=discord.Color.gold())
+        for item in self.view.children:
+            item.disabled = True
+        await interaction.message.edit(embed=embed, view=self.view)
+        await interaction.response.send_message("✅ تم إنهاء اللعبة وإعلان النتائج بنجاح!", ephemeral=True)
+
+class RebeccaGameView(discord.ui.View):
+    def __init__(self, host_id):
+        super().__init__(timeout=300)
+        self.host_id = host_id
+        self.players = []
+        self.game_started = False
+        self.chosen_letter = ""
+        self.submitted_users = set()
+        self.scores = {}
+
+    @discord.ui.button(label="دخول اللعبة 🎮", style=discord.ButtonStyle.green, custom_id="rebecca_join")
+    async def join_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.game_started:
+            await interaction.response.send_message("❌ لقد بدأت اللعبة بالفعل!", ephemeral=True)
+            return
+        if interaction.user in self.players:
+            await interaction.response.send_message("⚠️ أنت منضم بالفعل!", ephemeral=True)
+            return
+
+        self.players.append(interaction.user)
+        player_list = "\n".join([p.mention for p in self.players])
+        embed = interaction.message.embeds[0]
+        embed.description = f"**اللاعبون المنضمون ({len(self.players)}):**\n{player_list}\n\n*(ملاحظة: اللعبة تتطلب لاعبان على الأقل)*"
+        await interaction.message.edit(embed=embed)
+        await interaction.response.send_message("✅ انضممت إلى لعبة ربيكا بنجاح!", ephemeral=True)
+
+    @discord.ui.button(label="خروج من اللعبة 🚪", style=discord.ButtonStyle.danger, custom_id="rebecca_leave")
+    async def leave_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.game_started:
+            await interaction.response.send_message("❌ لا يمكنك الخروج بعد بدء اللعبة!", ephemeral=True)
+            return
+        if interaction.user not in self.players:
+            await interaction.response.send_message("⚠️ أنت لست منضماً أساساً!", ephemeral=True)
+            return
+
+        self.players.remove(interaction.user)
+        player_list = "\n".join([p.mention for p in self.players]) if self.players else "لا يوجد لاعبون منضمون حالياً."
+        embed = interaction.message.embeds[0]
+        embed.description = f"**اللاعبون المنضمون ({len(self.players)}):**\n{player_list}\n\n*(ملاحظة: اللعبة تتطلب لاعبان على الأقل)*"
+        await interaction.message.edit(embed=embed)
+        await interaction.response.send_message("✅ تم خروجك من اللعبة بنجاح.", ephemeral=True)
+
+    @discord.ui.button(label="بدء اللعبة 🚀", style=discord.ButtonStyle.primary, custom_id="rebecca_start")
+    async def start_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.host_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ فقط من بدأ الأمر أو الإدارة يستطيع بدء اللعبة!", ephemeral=True)
+            return
+        if self.game_started:
+            await interaction.response.send_message("❌ اللعبة بدأت بالفعل!", ephemeral=True)
+            return
+        if len(self.players) < 2:
+            await interaction.response.send_message("❌ ممنوع لعب ربيكا إذا كان عدد اللاعبين أقل من 2!", ephemeral=True)
+            return
+
+        self.game_started = True
+        letters = ["أ", "ب", "ت", "ج", "ح", "خ", "د", "ر", "س", "ش", "ص", "ع", "ف", "ق", "ك", "ل", "م", "ن", "هـ", "و", "ي"]
+        self.chosen_letter = random.choice(letters)
+
+        self.clear_items()
+        self.add_item(RebeccaParticipateButton(self))
+        self.add_item(RebeccaEndButton(self))
+
+        embed = discord.Embed(
+            title="💅 ربيكا تدير لعبة إنسان حيوان الجماعية!",
+            description=f"الحرف المطلوب لهذه الجولة هو: **{self.chosen_letter}**\n\nاضغط على زر **شارك بكلماتك ✍️** لإدخال إجاباتك!",
+            color=discord.Color.magenta()
+        )
+        await interaction.message.edit(embed=embed, view=self)
+        await interaction.response.send_message("🚀 بدأت الجولة! يمكن للمشاركين الضغط على زر المشاركة الآن.", ephemeral=True)
+
+# ==========================================
+# قائمة الألعاب الرئيسية (تظهر ربيكا ومافيا فقط)
+# ==========================================
+class GamesMenuView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=60)
+
+    @discord.ui.button(label="لعبة المافيا 🕵️‍♂️", style=discord.ButtonStyle.danger, custom_id="menu_mafia")
+    async def mafia_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="🕵️‍♂️ لعبة المافيا الجماعية",
+            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.",
+            color=discord.Color.red()
+        )
+        view = MafiaView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+
+    @discord.ui.button(label="لعبة ربيكا 💅", style=discord.ButtonStyle.primary, custom_id="menu_rebecca")
+    async def rebecca_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        embed = discord.Embed(
+            title="💅 لعبة ربيكا الجماعية (إنسان حيوان)",
+            description="**اللاعبون المنضمون (0):**\nلا يوجد لاعبون منضمون حالياً.\n\n*(ملاحظة: اللعبة تتطلب لاعبان على الأقل)*",
+            color=discord.Color.magenta()
+        )
+        view = RebeccaGameView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+
+# ==========================================
+# فئة الأوامر النصية التقليدية
+# ==========================================
+class Games(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    def load_data(self):
-        if not os.path.exists(DATA_FILE): return {}
-        with open(DATA_FILE, "r") as f:
-            try: return json.load(f)
-            except: return {}
-
-    def save_data(self, data):
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-
-    @app_commands.command(name="سؤال", description="يسألك البوت سؤالاً ممتعاً وعند الإجابة تكسب نقاط خبرة!")
-    async def ask_question(self, interaction: discord.Interaction):
-        if interaction.channel.id != QUESTIONS_CHANNEL_ID:
-            return await interaction.response.send_message(
-                f"❌ عذراً، هذا الأمر مخصص للاستخدام داخل <#{QUESTIONS_CHANNEL_ID}> فقط!", 
-                ephemeral=True
-            )
-
-        question = random.choice(CLEAN_QUESTIONS)
-        
+    @commands.command(name="العاب")
+    async def games_menu(self, ctx):
         embed = discord.Embed(
-            title="🤔 تحدي الأسئلة والنقاط",
-            description=f"**{interaction.user.mention}**، إليك سؤالك:\n\n> **{question}**\n\n⏳ **لديك 30 ثانية للإجابة في الشات وكسب النقاط!**",
-            color=0x8000FF
+            title="🎮 قائمة ألعاب السيرفر",
+            description="اختر اللعبة التي تريد بدءها من الأزرار بالأسفل:",
+            color=discord.Color.blue()
         )
-        
-        await interaction.response.send_message(embed=embed)
-
-        def check(m):
-            return m.author == interaction.user and m.channel == interaction.channel
-
-        try:
-            msg = await self.bot.wait_for('message', timeout=30.0, check=check)
-            
-            data = self.load_data()
-            user_id = str(interaction.user.id)
-            if user_id not in data:
-                data[user_id] = {"name": interaction.user.name, "xp": 0}
-            
-            points_reward = 15
-            data[user_id]["xp"] += points_reward
-            self.save_data(data)
-            
-            await msg.add_reaction("✨")
-            
-            success_embed = discord.Embed(
-                title="✅ كسبت نقاط جديدة!",
-                description=f"**إجابتك:** > {msg.content}\n\n🏆 **تمت إضافة +{points_reward} نقطة إلى رصيدك!** (تظهر في `/top`)",
-                color=0x00FF00
-            )
-            await interaction.followup.send(embed=success_embed)
-            
-        except asyncio.TimeoutError:
-            timeout_embed = discord.Embed(
-                title="⌛ انتهى الوقت!",
-                description=f"للأسف يا {interaction.user.mention}, لم تقم بالإجابة في الوقت المحدد ولم تحصل على نقاط.",
-                color=0xFF0000
-            )
-            await interaction.followup.send(embed=timeout_embed, ephemeral=True)
+        view = GamesMenuView()
+        await ctx.send(embed=embed, view=view)
 
 async def setup(bot):
-    await bot.add_cog(Game(bot))
+    await bot.add_cog(Games(bot))
