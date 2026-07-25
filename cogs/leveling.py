@@ -55,7 +55,7 @@ async def create_rank_card(member: discord.Member, level: int, xp: int, xp_neede
     # رسم إطار خارجي خفيف جمالي
     draw.rounded_rectangle([10, 10, 920, 270], radius=20, fill=(35, 39, 42, 255), outline=(114, 137, 218, 150), width=3)
 
-    # جلب صورة البروفایل الخاصة بالعضو
+    # جلب صورة البروفايل الخاصة بالعضو
     avatar_url = member.display_avatar.replace(size=256, format="png").url
     try:
         async with aiohttp.ClientSession() as session:
@@ -82,8 +82,8 @@ async def create_rank_card(member: discord.Member, level: int, xp: int, xp_neede
     except:
         font_large = font_medium = font_small = ImageFont.load_default()
 
-    # كتابة اسم العضو والمستوى
-    draw.text((230, 65], member.name, fill=(255, 255, 255, 255), font=font_large)
+    # كتابة اسم العضو والمستوى (تم تصحيح القوس هنا)
+    draw.text((230, 65), member.name, fill=(255, 255, 255, 255), font=font_large)
     
     # حساب النسبة المئوية للـ XP لشريط التقدم
     percent = min(max(xp / xp_needed, 0.0), 1.0)
