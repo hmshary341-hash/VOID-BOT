@@ -60,6 +60,8 @@ def get_user_data(data, user_id):
         "last_work_date": "",
         "nerd_count": 0,
         "last_nerd_date": "",
+        "task_request_time": "",
+        "last_message_time": "",
     }
   else:
     user_data = data[user_id]
@@ -75,10 +77,16 @@ def get_user_data(data, user_id):
           "last_work_date": "",
           "nerd_count": 0,
           "last_nerd_date": "",
+          "task_request_time": "",
+          "last_message_time": "",
       }
     else:
       if "last_task_date" not in user_data:
         user_data["last_task_date"] = ""
+      if "task_request_time" not in user_data:
+        user_data["task_request_time"] = ""
+      if "last_message_time" not in user_data:
+        user_data["last_message_time"] = ""
 
       # التحقق من إعادة تعيين الصناديق إذا تغير اليوم
       if user_data.get("last_box_date") != today_str:
@@ -90,20 +98,20 @@ def get_user_data(data, user_id):
   return data[user_id]
 
 
-class TaskButtons(discord.ui.View):
+# فيو زر التأكيد مع التحقق الحقيقي من تفاعل العضو
+class TaskConfirmView(discord.ui.View):
 
   def __init__(self, bot):
-    super().__init__(timeout=None)
+    super().__init__(timeout=180)
     self.bot = bot
 
-  # 1. زر إكمال المهمة (مرة واحدة فقط يومياً)
   @discord.ui.button(
-      label="إكمال المهام اليومية (500 كوينز)",
+      label="تم إنجاز المهمة",
       style=discord.ButtonStyle.success,
-      emoji="🎁",
-      custom_id="claim_task_reward",
+      emoji="✅",
+      custom_id="confirm_task_done",
   )
-  async def claim_task_reward(
+  async def confirm_task(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
     user = interaction.user
@@ -113,14 +121,36 @@ class TaskButtons(discord.ui.View):
     data = load_data()
     user_data = get_user_data(data, user.id)
 
-    # التحقق هل أتم المهمة اليوم مسبقاً (مرة واحدة فقط)
+    # التأكد مرة أخرى من عدم إتمامها اليوم
     if user_data.get("last_task_date") == today_str:
       await interaction.response.send_message(
-          "❌ لا أنت تلعب على من! أقول روح.. خلصت مهمتك اليومية، تعال بكرة 🤨",
+          "❌ أنت مسوي/ة المهمة أصلاً اليوم، لا تحاول تلف وتدور! 🤨",
           ephemeral=True,
       )
       return
 
+    # البوت يتحقق هل العضو كتب رسالة أو تفاعل بعد طلب المهام ولا لا
+    req_time_str = user_data.get("task_request_time", "")
+    msg_time_str = user_data.get("last_message_time", "")
+
+    is_cheating = True
+    if req_time_str and msg_time_str:
+      try:
+        req_time = datetime.datetime.fromisoformat(req_time_str)
+        msg_time = datetime.datetime.fromisoformat(msg_time_str)
+        if msg_time > req_time:
+          is_cheating = False
+      except:
+        pass
+
+    if is_cheating:
+      await interaction.response.send_message(
+          "❌ تبي/ن تلعب/ين علي؟ أقول روح/ي خلصي المهمات ورجع/ي بعدين! 🤨",
+          ephemeral=True,
+      )
+      return
+
+    # إذا اجتاز الفحص بنجاح
     user_data["last_task_date"] = today_str
     reward = 500
     user_data["coins"] += reward
@@ -128,17 +158,13 @@ class TaskButtons(discord.ui.View):
 
     current_balance = user_data["coins"]
 
-    # اختيار 3 مهمات عشوائية
-    assigned_tasks = random.sample(TASK_POOL, min(3, len(TASK_POOL)))
-    tasks_list_str = "\n".join(
-        [f"**{i+1}.** {task}" for i, task in enumerate(assigned_tasks)]
-    )
-
-    await interaction.response.send_message(
-        f"🎯 **مهامك اليومية الخاصة بك يا وحش:**\n\n{tasks_list_str}\n\n🎉"
-        f" تم إضافة **{reward:,} كوينز** إلى حسابك البنكي 🏦!\nرصيدك الحالي:"
-        f" **{current_balance:,} كوينز**",
-        ephemeral=True,
+    await interaction.response.edit_message(
+        content=(
+            "🎉 **كفو يا وحش! تأكد البوت من إنجازك للمهمة بنجاح!**\n💰 تم إضافة"
+            f" **{reward:,} كوينز** إلى حسابك البنكي 🏦!\nرصيدك الحالي:"
+            f" **{current_balance:,} كوينز**"
+        ),
+        view=None,
     )
 
     log_channel = guild.get_channel(LOG_CHANNEL_ID)
@@ -147,13 +173,62 @@ class TaskButtons(discord.ui.View):
           title="📜 سجل المهام - إنجاز مهام",
           description=(
               f"👤 **العضو:** {user.mention}\n"
-              "✅ **الحالة:** تم إنجاز المهمة اليومية بنجاح\n"
+              "✅ **الحالة:** تم إنجاز المهمة اليومية والتحقق منها بنجاح\n"
               f"💰 **العملات:** +{reward:,} كوينز (الرصيد الكلي في البنك:"
               f" {current_balance:,})"
           ),
           color=0x00FF00,
       )
       await log_channel.send(embed=embed_log)
+
+
+class TaskButtons(discord.ui.View):
+
+  def __init__(self, bot):
+    super().__init__(timeout=None)
+    self.bot = bot
+
+  # 1. زر إكمال المهام اليومية (بدون كتابة 500 كوينز)
+  @discord.ui.button(
+      label="إكمال المهام اليومية",
+      style=discord.ButtonStyle.success,
+      emoji="🎁",
+      custom_id="claim_task_reward",
+  )
+  async def claim_task_reward(
+      self, interaction: discord.Interaction, button: discord.ui.Button
+  ):
+    user = interaction.user
+    today_str = str(datetime.date.today())
+
+    data = load_data()
+    user_data = get_user_data(data, user.id)
+
+    # التحقق هل أتم المهمة اليوم مسبقاً
+    if user_data.get("last_task_date") == today_str:
+      await interaction.response.send_message(
+          "❌ لا أنت تلعب على من! أقول روح.. خلصت مهمتك اليومية، تعال بكرة 🤨",
+          ephemeral=True,
+      )
+      return
+
+    # تسجيل وقت طلب المهام بدقة للتحقق لاحقاً
+    user_data["task_request_time"] = datetime.datetime.now().isoformat()
+    save_data(data)
+
+    # اختيار 3 مهمات عشوائية
+    assigned_tasks = random.sample(TASK_POOL, min(3, len(TASK_POOL)))
+    tasks_list_str = "\n".join(
+        [f"**{i+1}.** {task}" for i, task in enumerate(assigned_tasks)]
+    )
+
+    await interaction.response.send_message(
+        f"🎯 **مهامك اليومية الخاصة بك يا وحش:**\n\n{tasks_list_str}\n\n👇"
+        " تفاعل في الشات ونفذ المهام ثم اضغط على زر **(تم إنجاز المهمة)**"
+        " أدناه:",
+        view=TaskConfirmView(self.bot),
+        ephemeral=True,
+    )
 
   # 2. زر فتح الصناديق العشوائية (3 محاولات يومياً بشكل مستقل)
   @discord.ui.button(
@@ -190,7 +265,7 @@ class TaskButtons(discord.ui.View):
         {"name": "500 كوينز أسطورية", "coins": 500, "rarity": "أسطوري 🟡", "is_role": False},
         {"name": "👑 ملك الحظ (5000 كوينز + رتبة ملك الحظ)", "coins": 5000, "rarity": "نادرة جداً وصعبة 💎", "is_role": True},
     ]
-    weights = [45, 30, 15, 8, 2]  # 2% فقط لملك الحظ
+    weights = [45, 30, 15, 8, 2]
 
     won_prize = random.choices(prizes, weights=weights, k=1)[0]
 
@@ -220,7 +295,6 @@ class TaskButtons(discord.ui.View):
       log_color = 0x9B59B6
       log_title = "📜 سجل الصناديق - 🏆 فوز أسطوري برتبة ملك الحظ!"
 
-      # إرسال رسالة علنية في الشات العام منشن للكل وللاعبي الرتبة
       try:
         await interaction.channel.send(
             f"@everyone يا جماعة الخير! شوفوا الحظ الخرافي عند {user.mention}، فتح الصندوق وفاز برتبة **ملك الحظ**! 🔥👑 **اشفحو عليه تراه اخذ الرتبه!**"
@@ -266,6 +340,16 @@ class TaskSystemCog(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
+  # مراقب الرسائل لتحديث وقت آخر تفاعل للعضو تلقائياً
+  @commands.Cog.listener()
+  async def on_message(self, message):
+    if message.author.bot:
+      return
+    data = load_data()
+    user_data = get_user_data(data, message.author.id)
+    user_data["last_message_time"] = datetime.datetime.now().isoformat()
+    save_data(data)
+
   task_group = app_commands.Group(
       name="task", description="أوامر نظام المهام والصناديق اليومية"
   )
@@ -285,7 +369,7 @@ class TaskSystemCog(commands.Cog):
         description=(
             "مرحبًا بك في نظام المهام والصناديق العشوائية الحصرية.\n\n"
             "✨ **ما يمكنك فعله هنا:**\n\n"
-            "• 🎁 استلام **المهام اليومية** و500 كوينز (**مرة واحدة فقط يومياً**).\n"
+            "• 🎁 استلام **المهام اليومية** (مرة واحدة فقط يومياً).\n"
             "• 📦 فتح **الصناديق العشوائية** (**3 محاولات يومياً** بحظك.. قد تفوز"
             " بكوينز أو **رتبة ملك الحظ** النادرة والصعبة!).\n\n"
             "⬇️ **اختر أحد الأزرار بالأسفل:**"
@@ -298,32 +382,49 @@ class TaskSystemCog(commands.Cog):
         "✅ تم نشر لوحة المهام بنجاح!", ephemeral=True
     )
 
-  # 2. أمر إعادة التعيين/التصفير (مخصص فقط لصاحب الرتبة المحددة)
+  # 2. أمر التصفير مع خيار تحديد العضو (اختياري)
   @task_group.command(
-      name="reset", description="إعادة تعيين محاولات المهام والصناديق الخاصة بك"
+      name="reset",
+      description=(
+          "إعادة تعيين محاولات المهام والصناديق (لك أو لعضو تختاره)"
+      ),
   )
-  async def reset_tasks(self, interaction: discord.Interaction):
-    # التحقق مما إذا كان المستخدم يمتلك الرتبة المحددة
+  @app_commands.describe(
+      member="العضو المراد تصفير مهامه وصناديقه (اختياري)"
+  )
+  async def reset_tasks(
+      self, interaction: discord.Interaction, member: discord.Member = None
+  ):
     has_role = any(role.id == RESET_ROLE_ID for role in interaction.user.roles)
-    if not has_role:
+    if not has_role and not interaction.user.guild_permissions.administrator:
       await interaction.response.send_message(
-          "❌ عذراً، هذا الأمر مخصص فقط لصاحب الرتبة المحددة ولا يمكنك"
-          " استخدامه!",
-          ephemeral=True,
+          "❌ عذراً، هذا الأمر مخصص فقط للأشخاص المخولين!", ephemeral=True
       )
       return
 
+    # إذا تم تحديد عضو يصفر له، وإذا لم يتم التحديد يصفر للمنفذ نفسه
+    target = member if member else interaction.user
+
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, target.id)
     user_data["last_task_date"] = ""
     user_data["box_count"] = 0
     user_data["last_box_date"] = ""
+    user_data["task_request_time"] = ""
+    user_data["last_message_time"] = ""
     save_data(data)
-    await interaction.response.send_message(
-        "🔄 تم تصفير وإعادة تعيين محاولات المهام والصناديق الخاصة بك بنجاح! تقدر"
-        " تجربها الآن.",
-        ephemeral=True,
-    )
+
+    if member:
+      await interaction.response.send_message(
+          f"🔄 تم تصفير وإعادة تعيين محاولات المهام والصناديق للعضو"
+          f" {member.mention} بنجاح! يقدر يعيدها الحين.",
+          ephemeral=True,
+      )
+    else:
+      await interaction.response.send_message(
+          "🔄 تم تصفير وإعادة تعيين محاولات المهام والصناديق الخاصة بك بنجاح!",
+          ephemeral=True,
+      )
 
 
 async def setup(bot):
