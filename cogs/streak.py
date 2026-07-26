@@ -38,7 +38,7 @@ class Streak(commands.Cog):
         if message.author.bot or not message.guild:
             return
 
-        # التحكد أن الرسالة في روم الستريك فقط
+        # التحقق أن الرسالة في روم الستريك فقط
         if message.channel.id != REMINDER_CHANNEL_ID:
             return
 
@@ -74,7 +74,6 @@ class Streak(commands.Cog):
         else:
             streak_count, last_date, shields = result
             if last_date == today:
-                # إذا أرسل صورة أخرى في نفس اليوم، نلغي التكرار أو نكتفي بتنبيهه
                 await message.reply("⚠️ لقد قمت بتسجيل ستريك اليوم مسبقاً!", delete_after=5)
                 return
 
@@ -85,19 +84,13 @@ class Streak(commands.Cog):
             if diff == 1:
                 streak_count += 1
             elif diff > 1:
-                missed_days = diff - 1
-                if shields >= missed_days:
-                    shields -= missed_days
+                if shields > 0:
+                    shields -= 1
                     streak_count += 1
-                    status_text = f"\n🛡️ تم استهلاك **{missed_days} درع** لحماية ستريكك بسبب الغياب!"
+                    status_text = f"\n🛡️ تم استهلاك **درع واحد** لحماية ستريكك من الانقطاع بسبب الغياب!"
                 else:
                     streak_count = 1
-                    shields = 0
-                    status_text = f"\n💔 انقطع ستريكك لعدم كفاية الدروع وتمت إعادته إلى 1!"
-
-            if streak_count == 5:
-                shields += 2
-                status_text += f"\n🎉 مبروك! وصل ستريكك إلى 5 أيام وحصلت على **2 درع 🛡️**!"
+                    status_text = f"\n💔 انقطع ستريكك بسبب الغياب لعدم وجود دروع وتمت إعادته إلى 1!"
 
             self.cursor.execute(
                 "UPDATE streaks SET streak_count = ?, last_date = ?, shields = ? WHERE user_id = ? AND guild_id = ?",
@@ -113,11 +106,11 @@ class Streak(commands.Cog):
             except Exception as e:
                 print(f"❌ خطأ في إعطاء رتبة الستريك: {e}")
 
-        # إرسال رسالة عامة في الروم تؤكد تسجيل الستريك
+        # إرسال رسالة تؤكد تسجيل الستريك
         await message.reply(
             f"🔥 | {message.author.mention}\n"
             f"• عدد أيام الستريك: **{streak_count}** يوم\n"
-            f"• عدد الدروع الحالية: **{shields} 🛡️**"
+            f"• الدروع المتبقية: **{shields} 🛡️**"
             f"{status_text}"
         )
 
@@ -138,23 +131,29 @@ class Streak(commands.Cog):
             mentions = []
             for row in rows:
                 user_id = row[0]
-                member = channel.guild.get_member(user_id)
-                if member and not member.bot:
-                    mentions.append(member.mention)
+                try:
+                    member = channel.guild.get_member(user_id)
+                    if not member:
+                        member = await channel.guild.fetch_member(user_id)
+                    
+                    if member and not member.bot:
+                        mentions.append(member.mention)
+                except Exception as e:
+                    print(f"⚠️ تعذر جلب العضو {user_id} للتذكير: {e}")
             
             if mentions:
                 chunks = [mentions[i:i + 10] for i in range(0, len(mentions), 10)]
                 for chunk in chunks:
                     try:
                         await channel.send(f"⚠️ **تنبيه الستريك اليومي!** لم تسجلوا تفاعلكم اليوم يا أبطال، الحقوا عليكم قبل أن ينقطع الستريك: {' '.join(chunk)}")
-                    except:
-                        pass
+                    except Exception as e:
+                        print(f"❌ خطأ في إرسال رسالة التذكير: {e}")
 
     @daily_reminder.before_loop
     async def before_daily_reminder(self):
         await self.bot.wait_until_ready()
 
-    @app_commands.command(name="streak", description="عرض عدد أيام الستريك الخاص بك وعدد الدروع المحمية")
+    @app_commands.command(name="streak", description="عرض عدد أيام الستريك الخاص بك والدروع")
     async def streak(self, interaction: discord.Interaction, member: discord.Member = None):
         await interaction.response.defer(ephemeral=True)
         target = member or interaction.user
@@ -173,7 +172,7 @@ class Streak(commands.Cog):
         await interaction.followup.send(
             f"🔥 | **{target.display_name}**\n"
             f"• عدد أيام الستريك: **{streak_count}** يوم\n"
-            f"• عدد الدروع الحالية: **{shields} 🛡️**",
+            f"• الدروع الحالية: **{shields} 🛡️**",
             ephemeral=True
         )
 
