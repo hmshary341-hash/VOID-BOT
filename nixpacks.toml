@@ -1,2 +1,5 @@
 [phases.setup]
 nixPkgs = ["python311", "ffmpeg", "libopus", "libsodium", "gcc"]
+
+[phases.start]
+cmd = ".venv/bin/python main.py"
