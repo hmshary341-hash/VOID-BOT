@@ -1,7 +1,8 @@
-discord.py>=2.0.0
+Discord.py>=2.0.0
 chat-exporter
 python-dotenv
 Pillow
 wavelink
 arabic-reshaper
 python-bidi
+openai
