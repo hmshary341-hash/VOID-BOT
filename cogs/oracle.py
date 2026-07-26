@@ -45,10 +45,10 @@ class Oracle(commands.Cog):
         self.last_message_time = time.time()
         self.IDLE_THRESHOLD = 20 * 60  # 20 دقيقة
         self.IDLE_MESSAGES = [
-            "إلا صدق، وينكم يا جماعة؟ الشات صاير كنه مقبرة 🥷😂",
-            "يا عيال وش السالفة؟ تحسّون الكل صامدين اليوم 👀",
-            "محد يبي يلعب ولا يسولف؟ ترا طفش لحالي هههههه ☕",
-            "يا إداريين ويا أعضاء، اصحوا! وين الحماس؟ 🔥"
+            "يا جماعة الشات هادي بزيادة، شكل الشباب يجهزون لخطة جهنمية 👀🔥",
+            "وينكم يا كواسر؟ الشات صاير كنه استراحة فاضية نص الليل ☕",
+            "الهدوء هذا وراه سر.. وش السالفة يا عيال، كلكم مشغولين تصنعون المستقبل؟ 🥷😂",
+            "ترا الطفش لحاله سالفة، أحد عنده موضوع نفتح جبهته ولا نسلك لبعض؟ 🎤✨"
         ]
         self.check_chat_idle.start()
 
@@ -70,23 +70,23 @@ class Oracle(commands.Cog):
             return self.custom_system_prompt
         
         return f"""
-أنت اسمك Oracle، عضو حقيقي تماماً داخل سيرفر ديسكورد ولست بوت تقليدي.
+أنت اسمك Oracle، العضو الـ "قادح، الزاحف، واللي يجدولها صح" في السيرفر. منت بوت تقليدي طفشني، أنت أسطورة الشات والفاهم بكل كبيرة وصغيرة بأسلوب كفو وواثق وبدون أي قلة أدب أو ألفاظ خارجة نهائياً (احترم الذوق العام وخلّك راقي بـ زحفتك).
 معلومات السيرفر وقاعدة المعرفة الخاصة بك هي كالتالي (هذه هي الحقيقة المطلقة، لا تخمن أبدًا خارجها):
 {json.dumps(self.server_data, ensure_ascii=False)}
 
 قواعد شخصيتك وتصرفاتك:
-1. تصرف كعضو حقيقي، تحب المزاح بخفة دم، تحترم الجميع، ولا تزعج الشات.
-2. لا تكرر الردود أبداً، ونوع في استخدام الإيموجيات ولا تستخدم نفس الشكل دائماً.
-3. تفهم اللهجة السعودية جيداً، وتتعامل باللغتين العربية والإنجليزية بطلاقة.
-4. قاعدة صارمة جداً: إذا سأل أي عضو عن شيء موجود داخل قاعدة المعرفة (server_data.json)، أجب منه بدقة. إذا لم تجد المعلومة أبداً، قل حرفياً وبكل بساطة أنك لا تعرفها ولا تخمن أبداً!
-5. حافظ على ردود سريعة ومختصرة وذكية.
+1. تصرف كعضو واثق، مزحك خفيف ولطيف يطير الطفش، تملك حضور طاغي وتجيبها على الراس وبكل ذكاء ("تجدول" السالفة بمهارة).
+2. لا تكرر الردود أبداً، ونوع في استخدام الإيموجيات وأسلوبك الكلامي عشان ما تصبح ممل.
+3. تفهم اللهجة السعودية وسوالف الشباب زين، وتتعامل بكل مرونة وذكاء.
+4. قاعدة صارمة جداً: إذا سأل أي عضو عن شيء موجود داخل قاعدة المعرفة (server_data.json)، أجب منه بدقة وثقة. إذا لم تجد المعلومة أبداً، قل بكل صراحة وبأسلوبك اللطيف إنها مو عندك ولا تخمن أبداً!
+5. حافظ على ردود سريعة، ذكية، وذات كاريزما عالية.
 """
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
         general_channel = discord.utils.get(member.guild.text_channels, name="general") or member.guild.system_channel
         if general_channel:
-            await general_channel.send(f"يا هلا والله بـ {member.mention} أنار السيرفر ونورنا! حياك بين إخوانك 🌹✨")
+            await general_channel.send(f"يا هلا والله بـ {member.mention} ⚡ نورت السيرفر وجات البركة، اعتبر نفسك بين إخوانك وفالك الطيب يا طويل العمر 🌹✨")
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -107,9 +107,9 @@ class Oracle(commands.Cog):
                     messages_payload.append({"role": "user", "content": f"{message.author.display_name}: {message.content}"})
 
                     response = await self.client.chat.completions.create(
-                        model="llama-3.3-70b-versatile",  # تم تحديث الموديل ليدعم Groq
+                        model="llama-3.3-70b-versatile",
                         messages=messages_payload,
-                        temperature=0.7,
+                        temperature=0.8,  # رفعناها شوي عشان يصير إبداعي أكثر
                         max_tokens=300
                     )
                     
@@ -117,7 +117,7 @@ class Oracle(commands.Cog):
                     await message.reply(reply_text)
                 except Exception as e:
                     print(f"❌ خطأ في الرد بالذكاء الاصطناعي: {e}")
-                    await message.channel.send("أوه، صار فيه لخبطة بسيطة عندي، دقايق وأرجع أروق! 😅")
+                    await message.channel.send("أوه، السيستم عندي أخذ له لفة مخ، دقايق وأرجع أروق وأظبطكم! 😅⚡")
 
     @tasks.loop(minutes=1)
     async def check_chat_idle(self):
@@ -142,7 +142,7 @@ class Oracle(commands.Cog):
 
     @app_commands.command(name="oracle", description="لوحة تحكم إعدادات أوراكل (للأونر فقط)")
     @app_commands.describe(
-        action="اختر الإجراء المطلوبة",
+        action="اختر الإجراء المطلوب",
         value="قيمة التغيير (حسب الأمر المطلوب)"
     )
     @app_commands.choices(action=[
@@ -156,32 +156,32 @@ class Oracle(commands.Cog):
     ])
     async def oracle_admin(self, interaction: discord.Interaction, action: str, value: str = None):
         if interaction.user != interaction.guild.owner:
-            await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص لصاحب السيرفر (Owner) فقط!", ephemeral=True)
+            await interaction.response.send_message("❌ عذراً يا وحش، هذا الأمر مخصص لصاحب السيرفر (Owner) بس!", ephemeral=True)
             return
 
         if action == "on":
             self.oracle_enabled = True
-            await interaction.response.send_message("🟢 تم تفعيل نظام تفاعل أوراكل بنجاح.", ephemeral=True)
+            await interaction.response.send_message("🟢 تم إطلاق أوراكل للجو وجاهز يجدول الشات بنجاح.", ephemeral=True)
         elif action == "off":
             self.oracle_enabled = False
-            await interaction.response.send_message("🔴 تم إيقاف نظام تفاعل أوراكل مؤقتاً.", ephemeral=True)
+            await interaction.response.send_message("🔴 تم كبح أوراكل وإيقافه مؤقتاً.", ephemeral=True)
         elif action == "reload":
             self.server_data = self.load_server_data()
-            await interaction.response.send_message("🔄 تمت إعادة تحميل قاعدة المعرفة (server_data.json) بنجاح!", ephemeral=True)
+            await interaction.response.send_message("🔄 تمت إعادة ضبط وتحميل قاعدة المعرفة (server_data.json) بنجاح!", ephemeral=True)
         elif action == "memory":
             msg_count = len(self.memory.messages)
             members_count = len(self.memory.known_members)
-            await interaction.response.send_message(f"🧠 **حالة الذاكرة:**\n- الرسائل المخزنة: {msg_count}/30\n- الأعضاء المتسجلين بالذاكرة: {members_count}", ephemeral=True)
+            await interaction.response.send_message(f"🧠 **حالة الذاكرة الحالية:**\n- الرسائل المخزنة: {msg_count}/30\n- الشباب المسجلين بالذاكرة: {members_count}", ephemeral=True)
         elif action == "prompt":
             if not value:
                 await interaction.response.send_message(f"📜 **الـ Prompt الحالي:**\n```json\n{self.get_system_prompt()[:1500]}...\n```", ephemeral=True)
             else:
                 self.custom_system_prompt = value
-                await interaction.response.send_message("✨ تم تحديث الـ Prompt بنجاح!", ephemeral=True)
+                await interaction.response.send_message("✨ تم تعديل شخصية الـ Prompt بمهارة!", ephemeral=True)
         elif action == "channel":
-            await interaction.response.send_message(f"📌 الإعداد الحالي يعمل في كافة الرومات المتاحة.", ephemeral=True)
+            await interaction.response.send_message(f"📌 النظام شغال ومفتوح في كافة الرومات المتاحة.", ephemeral=True)
         elif action == "personality":
-            await interaction.response.send_message("🎭 شخصية أوراكل مصممة خصيصاً باللهجة السعودية وبروح مرحة وغير مزعجة.", ephemeral=True)
+            await interaction.response.send_message("🎭 شخصية أوراكل الآن: قادح، زاحف، يجدولها صح، وبأخلاق عالية بدون أي قلة أدب.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(Oracle(bot))
