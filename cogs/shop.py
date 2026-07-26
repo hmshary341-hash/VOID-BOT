@@ -64,7 +64,7 @@ def deduct_user_coins(user_id, amount):
             data[user_id]["coins"] = max(0, data[user_id].get("coins", 0) - amount)
         save_data(data)
 
-# --- قائمة الشراء التفاعلية داخل التذكرة ---
+# --- قائمة الشراء التفاعلية داخل المتجر ---
 class PurchaseSelect(discord.ui.Select):
     def __init__(self, shop_type: str):
         self.shop_type = shop_type
@@ -167,9 +167,9 @@ class PurchaseSelect(discord.ui.Select):
                     except Exception as e:
                         print(f"❌ خطأ في إعطاء الرتبة: {e}")
             if role_given:
-                msg += "\n✨ تم منحك الرتبة تلقائياً وسيتم حذف التذكرة..."
+                msg += "\n✨ تم منحك الرتبة تلقائياً."
             else:
-                msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
+                msg += "\n📌 تم خصم المبلغ بنجاح."
         else:
             cursor.execute(
                 "SELECT streak_count, last_date, shields FROM streaks WHERE user_id = ? AND guild_id = ?",
@@ -190,24 +190,30 @@ class PurchaseSelect(discord.ui.Select):
                     (new_shields, today, new_bought, interaction.user.id, interaction.guild.id)
                 )
             conn.commit()
-            msg += "\n🛡️ تمت إضافة الدرع إلى ملف الستريك الخاص بك بنجاح وسيتم حذف التذكرة..."
+            msg += "\n🛡️ تمت إضافة الدرع إلى ملف الستريك الخاص بك بنجاح."
 
         conn.close()
 
-        # الرد على المستخدم
+        # الرد على المستخدم دون حذف الروم تلقائياً
         await interaction.response.send_message(msg, ephemeral=False)
-
-        # الانتظار لمدة 5 ثوانٍ ثم حذف روم التذكرة تلقائياً
-        await asyncio.sleep(5)
-        try:
-            await interaction.channel.delete()
-        except Exception as e:
-            print(f"❌ خطأ في حذف روم التذكرة: {e}")
 
 class PurchaseView(discord.ui.View):
     def __init__(self, shop_type: str):
         super().__init__(timeout=None)
         self.add_item(PurchaseSelect(shop_type))
+
+    @discord.ui.button(
+        label="قفل المتجر", 
+        style=discord.ButtonStyle.danger, 
+        custom_id="close_store_button"
+    )
+    async def close_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message("🔒 جاري قفل المتجر...", ephemeral=True)
+        await asyncio.sleep(2)
+        try:
+            await interaction.channel.delete()
+        except Exception as e:
+            print(f"❌ خطأ في قفل روم المتجر: {e}")
 
 class StoreView(discord.ui.View):
     def __init__(self):
@@ -262,7 +268,7 @@ class StoreView(discord.ui.View):
             overwrites=overwrites
         )
 
-        await interaction.followup.send(f"تم فتح تذكرتك بنجاح: {channel.mention}", ephemeral=True)
+        await interaction.followup.send(f"تم فتح متجرك بنجاح: {channel.mention}", ephemeral=True)
 
         view = PurchaseView(shop_type)
 
@@ -275,7 +281,7 @@ class StoreView(discord.ui.View):
                 "🔹 **Prime** - السعر: 45,000 كوينز\n"
                 "🌟 **Plus** - السعر: 25,000 كوينز\n"
                 "⭐ **Basic** - السعر: 10,000 كوينز\n\n"
-                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
                 view=view
             )
         elif shop_type == "titles":
@@ -284,7 +290,7 @@ class StoreView(discord.ui.View):
                 "إليك قائمة الألقاب المتاحة للشراء:\n\n"
                 "👑 **King** - السعر: 60,000 كوينز\n"
                 "👑 **Queen** - السعر: 60,000 كوينز\n\n"
-                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
                 view=view
             )
         else:
@@ -292,7 +298,7 @@ class StoreView(discord.ui.View):
                 f"أهلاً بك يا {user.mention} في قسم **إحتياجات الأعضاء**!\n"
                 "إليك المنتجات المتاحة:\n\n"
                 "🛡️ **درع حماية الستريك** - السعر: 500 كوينز *(حد أقصى درعين يومياً)*\n\n"
-                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
                 view=view
             )
 
