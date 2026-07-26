@@ -6,11 +6,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+# --- الإعدادات والثوابت ---
 DATA_FILE = "/app/data/economy.json"
 
 TASK_CHANNEL_ID = 1530834779833106543
 LOG_CHANNEL_ID = 1530835629573673031
-SPECIAL_ROLE_ID = 1530838834130976779
+SPECIAL_ROLE_ID = 1530838834130976779  # رتبة ملك الحظ (من الصناديق)
+RESET_ROLE_ID = 1529995977203777566  # الرتبة المسموح لها استخدام أمر التصفير
 
 # قائمة المهام العشوائية المتنوعة
 TASK_POOL = [
@@ -268,6 +270,7 @@ class TaskSystemCog(commands.Cog):
       name="task", description="أوامر نظام المهام والصناديق اليومية"
   )
 
+  # 1. أمر نشر لوحة المهام (للأدمن فقط)
   @task_group.command(
       name="panel", description="نشر لوحة المهام اليومية في السيرفر"
   )
@@ -292,7 +295,33 @@ class TaskSystemCog(commands.Cog):
 
     await target_channel.send(embed=embed, view=TaskButtons(self.bot))
     await interaction.response.send_message(
-        "✅ تم تعديل النظام: المهام مرة واحدة يومياً، والصناديق 3 محاولات يومياً بشكل مستقل!",
+        "✅ تم نشر لوحة المهام بنجاح!", ephemeral=True
+    )
+
+  # 2. أمر إعادة التعيين/التصفير (مخصص فقط لصاحب الرتبة المحددة)
+  @task_group.command(
+      name="reset", description="إعادة تعيين محاولات المهام والصناديق الخاصة بك"
+  )
+  async def reset_tasks(self, interaction: discord.Interaction):
+    # التحقق مما إذا كان المستخدم يمتلك الرتبة المحددة
+    has_role = any(role.id == RESET_ROLE_ID for role in interaction.user.roles)
+    if not has_role:
+      await interaction.response.send_message(
+          "❌ عذراً، هذا الأمر مخصص فقط لصاحب الرتبة المحددة ولا يمكنك"
+          " استخدامه!",
+          ephemeral=True,
+      )
+      return
+
+    data = load_data()
+    user_data = get_user_data(data, interaction.user.id)
+    user_data["last_task_date"] = ""
+    user_data["box_count"] = 0
+    user_data["last_box_date"] = ""
+    save_data(data)
+    await interaction.response.send_message(
+        "🔄 تم تصفير وإعادة تعيين محاولات المهام والصناديق الخاصة بك بنجاح! تقدر"
+        " تجربها الآن.",
         ephemeral=True,
     )
 
