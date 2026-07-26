@@ -9,8 +9,8 @@ class BotCog(commands.Cog):
         # آيدي الروم المسموح للبوت العمل فيه فقط
         self.TARGET_CHANNEL_ID = 1530053011861278741
         
-        # إعداد واجهة OpenAI (يُفضل سحبها من البيئة أو وضع المفتاح مباشرة)
-        self.client_ai = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY", "ضع_مفتاح_OPENAI_هنا"))
+        # إعداد واجهة OpenAI
+        self.client_ai = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
         # شخصية البوت (حارس بوابات ساخر بالعامية الخليجية)
         self.BOT_PERSONALITY = """
@@ -95,6 +95,5 @@ class BotCog(commands.Cog):
             except Exception as e:
                 await ctx.send(f"حدث خطأ أثناء المعالجة: {e}")
 
-# دالة الربط مع نظام الـ Cogs الرئيسي في بوتك
 async def setup(bot):
     await bot.add_cog(BotCog(bot))
