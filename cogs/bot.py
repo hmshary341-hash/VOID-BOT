@@ -43,12 +43,15 @@ class BotCog(commands.Cog):
 
         channel = interaction.user.voice.channel
         
-        if interaction.guild.voice_client:
-            await interaction.guild.voice_client.move_to(channel)
-        else:
-            await channel.connect()
-            
-        await interaction.followup.send("🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟")
+        try:
+            if interaction.guild.voice_client:
+                await interaction.guild.voice_client.move_to(channel)
+            else:
+                await channel.connect(timeout=10.0)
+                
+            await interaction.followup.send("🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟")
+        except Exception as e:
+            await interaction.followup.send(f"❌ فشل الاتصال بالروم الصوتي أو انتهت المهلة. الخطأ: {e}", ephemeral=True)
 
     # أمر فرعي: /voice leave
     @voice_group.command(name="leave", description="يغادر البوت الروم الصوتي")
