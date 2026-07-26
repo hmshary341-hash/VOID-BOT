@@ -2,6 +2,7 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
+from gtts import gTTS
 import openai
 
 
@@ -24,7 +25,7 @@ class BotCog(commands.Cog):
     self.BOT_PERSONALITY = """
 أنت حارس بوابات ساخر ومضحك، تتحدث بالعامية الخليجية/العربية. 
 تتفاعل مع الأعضاء بكوميديا خفيفة، ولا تعطيهم إجابات مباشرة بدون بعض التذمر الساخر والفكاهي.
-اجعل ردودك قصيرة جداً (لا تتجاوز جملتين).
+اجعل ردودك قصيرة جداً (لا تتجاوز جملتين) لكي يتم نطقها سريعاً.
 """
 
   @commands.Cog.listener()
@@ -108,7 +109,18 @@ class BotCog(commands.Cog):
       ai_reply = response.choices[0].message.content
       print(f"رد الذكاء الاصطناعي: {ai_reply}")
 
-      # إرسال النص النتيجة في الشات
+      # 2. تحويل النص إلى صوت مجاني وتشغيله في الروم
+      tts = gTTS(text=ai_reply, lang="ar")
+      audio_file = "response.mp3"
+      tts.save(audio_file)
+
+      vc = interaction.guild.voice_client
+      if vc.is_playing():
+        vc.stop()
+
+      vc.play(discord.FFmpegPCMAudio(audio_file))
+
+      # 3. إرسال النص النتيجة في الشات مع الصوت
       await interaction.followup.send(f"💬 **البوت:** {ai_reply}")
 
     except Exception as e:
