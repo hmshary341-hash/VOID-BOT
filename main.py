@@ -5,10 +5,10 @@ from discord.ext import commands
 from cogs.tickets import TicketActions, OpenTicketView
 from cogs.shop import StoreView  
 
-# إعداد الصلاحيات (Intents)
+# إعداد الصلاحيات (Intents) - استخدام all() يفعّل كل الصلاحيات بما فيها الصوت (voice_states)
 intents = discord.Intents.all()
 
-# تعريف البوت مع بادئة الأوامر -
+# تعريف البوت مع بادئة الأوامر
 bot = commands.Bot(command_prefix="-", intents=intents)
 
 @bot.event
