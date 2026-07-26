@@ -11,7 +11,7 @@ from datetime import date
 DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "economy.json")
-DB_PATH = "streaks.db"  # قاعدة بيانات الستريك المشتركة
+DB_PATH = os.path.join(DATA_DIR, "streaks.db")  # قاعدة بيانات الستريك المشتركة
 
 # --- أسعار وأتمتة المنتجات ---
 ROLES_SHOP = {
@@ -109,20 +109,22 @@ class PurchaseSelect(discord.ui.Select):
             )
             return
 
-        # الاتصال بقاعدة البيانات والتحقق من الأعمدة وإضافتها إن لم تكن موجودة
+        # الاتصال بقاعدة البيانات وضمان إنشاء الجدول والأعمدة تلقائياً بأمان
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # التأكد من وجود أعمدة الدروع وسجلات الشراء لتجنب الأخطاء
-        cursor.execute("PRAGMA table_info(streaks)")
-        columns = [col[1] for col in cursor.fetchall()]
-        
-        if "shields" not in columns:
-            cursor.execute("ALTER TABLE streaks ADD COLUMN shields INTEGER DEFAULT 0")
-        if "last_shield_date" not in columns:
-            cursor.execute("ALTER TABLE streaks ADD COLUMN last_shield_date TEXT DEFAULT ''")
-        if "shield_bought_today" not in columns:
-            cursor.execute("ALTER TABLE streaks ADD COLUMN shield_bought_today INTEGER DEFAULT 0")
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS streaks (
+                user_id INTEGER,
+                guild_id INTEGER,
+                streak_count INTEGER,
+                last_date TEXT,
+                shields INTEGER DEFAULT 0,
+                last_shield_date TEXT DEFAULT '',
+                shield_bought_today INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, guild_id)
+            )
+        """)
         conn.commit()
 
         today = str(date.today())
