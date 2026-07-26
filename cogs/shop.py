@@ -109,10 +109,24 @@ class PurchaseSelect(discord.ui.Select):
             )
             return
 
-        # فحص الحد اليومي للدروع في جدول قاعدة البيانات المشتركة
+        # الاتصال بقاعدة البيانات والتحقق من الأعمدة وإضافتها إن لم تكن موجودة
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        
+        # التأكد من وجود أعمدة الدروع وسجلات الشراء لتجنب الأخطاء
+        cursor.execute("PRAGMA table_info(streaks)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if "shields" not in columns:
+            cursor.execute("ALTER TABLE streaks ADD COLUMN shields INTEGER DEFAULT 0")
+        if "last_shield_date" not in columns:
+            cursor.execute("ALTER TABLE streaks ADD COLUMN last_shield_date TEXT DEFAULT ''")
+        if "shield_bought_today" not in columns:
+            cursor.execute("ALTER TABLE streaks ADD COLUMN shield_bought_today INTEGER DEFAULT 0")
+        conn.commit()
+
         today = str(date.today())
+        bought_today = 0
         
         if self.shop_type == "needs":
             cursor.execute(
@@ -121,7 +135,6 @@ class PurchaseSelect(discord.ui.Select):
             )
             result = cursor.fetchone()
             
-            bought_today = 0
             if result:
                 last_s_date = result[3]
                 bought_today = result[4] if result[4] is not None else 0
@@ -156,14 +169,19 @@ class PurchaseSelect(discord.ui.Select):
             else:
                 msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
         else:
-            # إضافة درع وتحديث سجل الشراء اليومي في قاعدة بيانات الستريك
-            if result is None:
+            cursor.execute(
+                "SELECT streak_count, last_date, shields FROM streaks WHERE user_id = ? AND guild_id = ?",
+                (interaction.user.id, interaction.guild.id)
+            )
+            res = cursor.fetchone()
+
+            if res is None:
                 cursor.execute(
                     "INSERT INTO streaks (user_id, guild_id, streak_count, last_date, shields, last_shield_date, shield_bought_today) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     (interaction.user.id, interaction.guild.id, 0, "", 1, today, 1)
                 )
             else:
-                new_shields = result[2] + 1
+                new_shields = res[2] + 1
                 new_bought = (bought_today + 1)
                 cursor.execute(
                     "UPDATE streaks SET shields = ?, last_shield_date = ?, shield_bought_today = ? WHERE user_id = ? AND guild_id = ?",
@@ -191,7 +209,7 @@ class PurchaseView(discord.ui.View):
 
 class StoreView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)  # timeout=None لتبقى الأزرار تعمل للأبد
+        super().__init__(timeout=None)
 
     @discord.ui.button(
         label="افتح متجر الرتب", 
@@ -223,7 +241,6 @@ class StoreView(discord.ui.View):
         guild = interaction.guild
         user = interaction.user
 
-        # آي دي الروم المخصص لاستخراج الفئة تلقائياً
         channel_id = 1530408124958244975 
         base_channel = guild.get_channel(channel_id)
         category = base_channel.category if base_channel else None
