@@ -2,7 +2,13 @@ import discord
 from discord.ext import commands, tasks
 from discord import app_commands
 import sqlite3
+import os
 from datetime import datetime, date
+
+# --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات عند تعديل الكود ---
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, "streaks.db")
 
 # --- الإعدادات ---
 STREAK_ROLE_ID = 1530367528046694500     # آي دي رتبة الستريك
@@ -19,7 +25,7 @@ class Streak(commands.Cog):
         self.daily_reminder.cancel()
 
     def db_setup(self):
-        self.conn = sqlite3.connect("streaks.db")
+        self.conn = sqlite3.connect(DB_PATH)
         self.cursor = self.conn.cursor()
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS streaks (
@@ -28,6 +34,8 @@ class Streak(commands.Cog):
                 streak_count INTEGER,
                 last_date TEXT,
                 shields INTEGER DEFAULT 0,
+                last_shield_date TEXT DEFAULT '',
+                shield_bought_today INTEGER DEFAULT 0,
                 PRIMARY KEY (user_id, guild_id)
             )
         """)
@@ -68,7 +76,7 @@ class Streak(commands.Cog):
             streak_count = 1
             shields = 0
             self.cursor.execute(
-                "INSERT INTO streaks VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO streaks (user_id, guild_id, streak_count, last_date, shields) VALUES (?, ?, ?, ?, ?)",
                 (user_id, guild_id, streak_count, today, shields)
             )
         else:
