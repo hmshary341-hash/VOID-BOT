@@ -33,7 +33,11 @@ class ChatMemory:
 class Oracle(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # تم ضبطه ليعمل مع مفتاح وخدمة Groq مباشرة
+        self.client = AsyncOpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY"),
+            base_url="https://api.groq.com/openai/v1"
+        )
         self.memory = ChatMemory()
         self.oracle_enabled = True
         self.custom_system_prompt = None
@@ -103,7 +107,7 @@ class Oracle(commands.Cog):
                     messages_payload.append({"role": "user", "content": f"{message.author.display_name}: {message.content}"})
 
                     response = await self.client.chat.completions.create(
-                        model="gpt-4o",
+                        model="llama-3.3-70b-versatile",  # تم تحديث الموديل ليدعم Groq
                         messages=messages_payload,
                         temperature=0.7,
                         max_tokens=300
