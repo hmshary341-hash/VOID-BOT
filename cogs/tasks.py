@@ -98,22 +98,25 @@ def get_user_data(data, user_id):
   return data[user_id]
 
 
-# فيو زر التأكيد مع التحقق الحقيقي من تفاعل العضو
+# فيو زر التأكيد مع timeout=None لمنع انتهاء الصلاحية وحل المشكلة
 class TaskConfirmView(discord.ui.View):
 
   def __init__(self, bot):
-    super().__init__(timeout=180)
+    super().__init__(timeout=None)
     self.bot = bot
 
   @discord.ui.button(
       label="تم إنجاز المهمة",
       style=discord.ButtonStyle.success,
       emoji="✅",
-      custom_id="confirm_task_done",
+      custom_id="confirm_task_done_persistent",
   )
   async def confirm_task(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
+    # تأجيل الاستجابة فوراً لمنع خطأ Interaction failed
+    await interaction.response.defer(ephemeral=True)
+
     user = interaction.user
     guild = interaction.guild
     today_str = str(datetime.date.today())
@@ -123,7 +126,7 @@ class TaskConfirmView(discord.ui.View):
 
     # التأكد مرة أخرى من عدم إتمامها اليوم
     if user_data.get("last_task_date") == today_str:
-      await interaction.response.send_message(
+      await interaction.followup.send(
           "❌ أنت مسوي/ة المهمة أصلاً اليوم، لا تحاول تلف وتدور! 🤨",
           ephemeral=True,
       )
@@ -144,7 +147,7 @@ class TaskConfirmView(discord.ui.View):
         pass
 
     if is_cheating:
-      await interaction.response.send_message(
+      await interaction.followup.send(
           "❌ تبي/ن تلعب/ين علي؟ أقول روح/ي خلصي المهمات ورجع/ي بعدين! 🤨",
           ephemeral=True,
       )
@@ -158,13 +161,21 @@ class TaskConfirmView(discord.ui.View):
 
     current_balance = user_data["coins"]
 
-    await interaction.response.edit_message(
-        content=(
-            "🎉 **كفو يا وحش! تأكد البوت من إنجازك للمهمة بنجاح!**\n💰 تم إضافة"
-            f" **{reward:,} كوينز** إلى حسابك البنكي 🏦!\nرصيدك الحالي:"
-            f" **{current_balance:,} كوينز**"
-        ),
-        view=None,
+    try:
+      await interaction.message.edit(
+          content=(
+              "🎉 **كفو يا وحش! تأكد البوت من إنجازك للمهمة بنجاح!**\n💰 تم إضافة"
+              f" **{reward:,} كوينز** إلى حسابك البنكي 🏦!\nرصيدك الحالي:"
+              f" **{current_balance:,} كوينز**"
+          ),
+          view=None,
+      )
+    except:
+      pass
+
+    await interaction.followup.send(
+        f"🎉 تم إنجاز المهمة بنجاح وإضافة {reward:,} كوينز لرصيدك!",
+        ephemeral=True,
     )
 
     log_channel = guild.get_channel(LOG_CHANNEL_ID)
@@ -188,7 +199,7 @@ class TaskButtons(discord.ui.View):
     super().__init__(timeout=None)
     self.bot = bot
 
-  # 1. زر إكمال المهام اليومية (بدون كتابة 500 كوينز)
+  # 1. زر إكمال المهام اليومية
   @discord.ui.button(
       label="إكمال المهام اليومية",
       style=discord.ButtonStyle.success,
@@ -198,6 +209,8 @@ class TaskButtons(discord.ui.View):
   async def claim_task_reward(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
+    await interaction.response.defer(ephemeral=True)
+
     user = interaction.user
     today_str = str(datetime.date.today())
 
@@ -206,7 +219,7 @@ class TaskButtons(discord.ui.View):
 
     # التحقق هل أتم المهمة اليوم مسبقاً
     if user_data.get("last_task_date") == today_str:
-      await interaction.response.send_message(
+      await interaction.followup.send(
           "❌ لا أنت تلعب على من! أقول روح.. خلصت مهمتك اليومية، تعال بكرة 🤨",
           ephemeral=True,
       )
@@ -222,7 +235,7 @@ class TaskButtons(discord.ui.View):
         [f"**{i+1}.** {task}" for i, task in enumerate(assigned_tasks)]
     )
 
-    await interaction.response.send_message(
+    await interaction.followup.send(
         f"🎯 **مهامك اليومية الخاصة بك يا وحش:**\n\n{tasks_list_str}\n\n👇"
         " تفاعل في الشات ونفذ المهام ثم اضغط على زر **(تم إنجاز المهمة)**"
         " أدناه:",
@@ -240,6 +253,8 @@ class TaskButtons(discord.ui.View):
   async def open_mystery_box(
       self, interaction: discord.Interaction, button: discord.ui.Button
   ):
+    await interaction.response.defer(ephemeral=True)
+
     user = interaction.user
     guild = interaction.guild
     today_str = str(datetime.date.today())
@@ -249,7 +264,7 @@ class TaskButtons(discord.ui.View):
 
     # التحقق من الحد اليومي للصناديق (3 محاولات)
     if user_data["box_count"] >= 3:
-      await interaction.response.send_message(
+      await interaction.followup.send(
           "❌ لا أنت تلعب على من! أقول روح.. استهلكت محاولاتك الـ 3 لفتح الصناديق اليوم، تعال بكرة 🤨",
           ephemeral=True,
       )
@@ -317,7 +332,7 @@ class TaskButtons(discord.ui.View):
       log_color = 0xF1C40F
       log_title = "📜 سجل الصناديق - فتح صندوق"
 
-    await interaction.response.send_message(reply_msg, ephemeral=True)
+    await interaction.followup.send(reply_msg, ephemeral=True)
 
     log_channel = guild.get_channel(LOG_CHANNEL_ID)
     if log_channel:
@@ -339,6 +354,9 @@ class TaskSystemCog(commands.Cog):
 
   def __init__(self, bot):
     self.bot = bot
+    # تسجيل الفيو المستمر عند تشغيل الكوج لضمان عدم توقف الأزرار القديمة
+    self.bot.add_view(TaskButtons(bot))
+    self.bot.add_view(TaskConfirmView(bot))
 
   # مراقب الرسائل لتحديث وقت آخر تفاعل للعضو تلقائياً
   @commands.Cog.listener()
