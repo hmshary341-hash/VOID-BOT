@@ -2,7 +2,6 @@ import os
 import discord
 from discord import app_commands
 from discord.ext import commands
-from gtts import gTTS
 import openai
 
 
@@ -25,7 +24,7 @@ class BotCog(commands.Cog):
     self.BOT_PERSONALITY = """
 أنت حارس بوابات ساخر ومضحك، تتحدث بالعامية الخليجية/العربية. 
 تتفاعل مع الأعضاء بكوميديا خفيفة، ولا تعطيهم إجابات مباشرة بدون بعض التذمر الساخر والفكاهي.
-اجعل ردودك قصيرة جداً (لا تتجاوز جملتين) لكي يتم نطقها سريعاً.
+اجعل ردودك قصيرة جداً (لا تتجاوز جملتين).
 """
 
   @commands.Cog.listener()
@@ -36,11 +35,11 @@ class BotCog(commands.Cog):
       print(f"✅ تمت مزامنة {len(synced)} من أوامر السلاش بنجاح.")
     except Exception as e:
       print(f"❌ خطأ في مزامنة الأوامر: {e}")
-    print(f"✅ تم تفعيل cog البوت الصوتي (أوامر فرعية تحت /voice) بنجاح")
+    print(f"✅ تم تفعيل cog البوت بنجاح")
 
   # أمر فرعي: /voice join
   @voice_group.command(
-      name="join", description="يدخل البوت إلى الروم الصوتي الذي أنت فيه"
+      name="join", description="يدخل البوت إلى الروم الصوتي"
   )
   async def join(self, interaction: discord.Interaction):
     if not interaction.user.voice:
@@ -49,9 +48,7 @@ class BotCog(commands.Cog):
       )
       return
 
-    # تأجيل الرد فوراً لمنع خطأ انتهاء المهلة
     await interaction.response.defer()
-
     channel = interaction.user.voice.channel
 
     try:
@@ -65,8 +62,7 @@ class BotCog(commands.Cog):
       )
     except Exception as e:
       await interaction.followup.send(
-          f"❌ فشل الاتصال بالروم الصوتي أو انتهت المهلة. الخطأ: {e}",
-          ephemeral=True,
+          f"❌ فشل الاتصال بالروم. الخطأ: {e}", ephemeral=True
       )
 
   # أمر فرعي: /voice leave
@@ -82,22 +78,15 @@ class BotCog(commands.Cog):
 
   # أمر فرعي: /voice talk
   @voice_group.command(
-      name="talk", description="تحدث مع البوت الصوتي بالذكاء الاصطناعي"
+      name="talk", description="تحدث مع البوت بالذكاء الاصطناعي"
   )
   @app_commands.describe(message="اكتب رسالتك أو سؤالك للبوت")
   async def talk(self, interaction: discord.Interaction, message: str):
-    if not interaction.guild.voice_client:
-      await interaction.response.send_message(
-          "❌ يا ابن الحلال، دخلني الروم الصوتي أولاً باستخدام `/voice join`!",
-          ephemeral=True,
-      )
-      return
-
     # تأجيل الرد لتفادي انتهاء مهلة ديسكورد
     await interaction.response.defer()
 
     try:
-      # 1. جلب رد الذكاء الاصطناعي باستخدام نموذج Llama 3 المجاني من Groq
+      # جلب رد الذكاء الاصطناعي باستخدام نموذج Llama 3 المجاني من Groq
       response = self.client_ai.chat.completions.create(
           model="llama-3.3-70b-versatile",
           messages=[
@@ -109,18 +98,7 @@ class BotCog(commands.Cog):
       ai_reply = response.choices[0].message.content
       print(f"رد الذكاء الاصطناعي: {ai_reply}")
 
-      # 2. تحويل النص إلى صوت مجاني وتشغيله في الروم
-      tts = gTTS(text=ai_reply, lang="ar")
-      audio_file = "response.mp3"
-      tts.save(audio_file)
-
-      vc = interaction.guild.voice_client
-      if vc.is_playing():
-        vc.stop()
-
-      vc.play(discord.FFmpegPCMAudio(audio_file))
-
-      # 3. إرسال النص النتيجة في الشات مع الصوت
+      # إرسال الرد النصي في الشات مباشرة
       await interaction.followup.send(f"💬 **البوت:** {ai_reply}")
 
     except Exception as e:
