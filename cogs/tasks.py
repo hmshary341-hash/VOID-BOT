@@ -12,6 +12,20 @@ TASK_CHANNEL_ID = 1530834779833106543
 LOG_CHANNEL_ID = 1530835629573673031
 SPECIAL_ROLE_ID = 1530838834130976779
 
+# قائمة المهام العشوائية المتنوعة
+TASK_POOL = [
+    "💬 اكتب 'سبحان الله وبحمده' في الشات العام.",
+    "🎮 العب أي لعبة في الديسكورد أو جهازك لمدة 5 دقائق.",
+    "📸 صور أطرف شيء جنبك أو في غرفتك.",
+    "🤝 ساعد شخص في الشات أو رد على استفساره.",
+    "☕ قم اشرب كاسة موية وخذ لك راحة قصيرة.",
+    "😂 ارسل نكتة مضحكة أو موقف محرج في الشات العام.",
+    "⭐ حط تفاعل (إيموجي) على آخر رسائل في السيرفر.",
+    "🎤 ادخل روم صوتي لمدة دقيقة وسلم على الموجودين.",
+    "✍️ اكتب اسمك بالعربي معكوس في الشات العام.",
+    "🔥 حط شعار السيرفر أو اسم مميز في حالتك لمدة ساعة.",
+]
+
 
 def load_data():
   if not os.path.exists(DATA_FILE):
@@ -34,6 +48,7 @@ def get_user_data(data, user_id):
     data[user_id] = {
         "coins": 0,
         "last_task_date": "",
+        "last_box_date": "",
         "daily_transferred": 0,
         "last_date": "",
         "last_daily_date": "",
@@ -47,6 +62,7 @@ def get_user_data(data, user_id):
       data[user_id] = {
           "coins": user_data,
           "last_task_date": "",
+          "last_box_date": "",
           "daily_transferred": 0,
           "last_date": "",
           "last_daily_date": "",
@@ -54,8 +70,11 @@ def get_user_data(data, user_id):
           "nerd_count": 0,
           "last_nerd_date": "",
       }
-    elif "last_task_date" not in user_data:
-      user_data["last_task_date"] = ""
+    else:
+      if "last_task_date" not in user_data:
+        user_data["last_task_date"] = ""
+      if "last_box_date" not in user_data:
+        user_data["last_box_date"] = ""
   return data[user_id]
 
 
@@ -65,8 +84,9 @@ class TaskButtons(discord.ui.View):
     super().__init__(timeout=None)
     self.bot = bot
 
+  # 1. زر إكمال المهمة (يعطي 3 مهمات عشوائية مخفية مرة كل يوم)
   @discord.ui.button(
-      label="إكمال المهمة (500 كوينز)",
+      label="إكمال المهام اليومية (500 كوينز)",
       style=discord.ButtonStyle.success,
       emoji="🎁",
       custom_id="claim_task_reward",
@@ -81,12 +101,19 @@ class TaskButtons(discord.ui.View):
     data = load_data()
     user_data = get_user_data(data, user.id)
 
+    # التحقق هل خلص مهمته اليوم ولا لا
     if user_data.get("last_task_date") == today_str:
       await interaction.response.send_message(
-          "❌ لقد أتممت مهمتك اليومية بالفعل! تتجدد المهمة كل يوم، تعال غداً.",
+          "❌ لا أنت تلعب على من! أقول روح.. خلصت مهمتك اليومية، تعال بكرة 🤨",
           ephemeral=True,
       )
       return
+
+    # اختيار 3 مهمات عشوائية لكل مستخدم بحظه
+    assigned_tasks = random.sample(TASK_POOL, min(3, len(TASK_POOL)))
+    tasks_list_str = "\n".join(
+        [f"**{i+1}.** {task}" for i, task in enumerate(assigned_tasks)]
+    )
 
     reward = 500
     user_data["coins"] += reward
@@ -95,19 +122,21 @@ class TaskButtons(discord.ui.View):
 
     current_balance = user_data["coins"]
 
+    # رسالة مخفية بالمهام الثلاث والرصيد
     await interaction.response.send_message(
-        f"🎉 مبروك يا وحش! أتممت المهمة بنجاح وتمت إضافة **{reward:,} كوينز**"
-        f" إلى حسابك البنكي 🏦!\nرصيدك الحالي: **{current_balance:,} كوينز**",
+        f"🎯 **مهامك اليومية الخاصة بك يا وحش:**\n\n{tasks_list_str}\n\n🎉"
+        f" تم إضافة **{reward:,} كوينز** إلى حسابك البنكي 🏦!\nرصيدك الحالي:"
+        f" **{current_balance:,} كوينز**",
         ephemeral=True,
     )
 
     log_channel = guild.get_channel(LOG_CHANNEL_ID)
     if log_channel:
       embed_log = discord.Embed(
-          title="📜 سجل المهام - إنجاز مهمة",
+          title="📜 سجل المهام - إنجاز مهام",
           description=(
               f"👤 **العضو:** {user.mention}\n"
-              "✅ **الحالة:** تم التحقق وإنجاز المهمة بنجاح\n"
+              "✅ **الحالة:** تم جلب المهام الثلاث بنجاح\n"
               f"💰 **العملات:** +{reward:,} كوينز (الرصيد الكلي في البنك:"
               f" {current_balance:,})"
           ),
@@ -115,6 +144,7 @@ class TaskButtons(discord.ui.View):
       )
       await log_channel.send(embed=embed_log)
 
+  # 2. زر فتح الصناديق العشوائية (مرة واحدة يومياً + رتبة نادرة وصعبة)
   @discord.ui.button(
       label="فتح صندوق عشوائي",
       style=discord.ButtonStyle.danger,
@@ -126,63 +156,81 @@ class TaskButtons(discord.ui.View):
   ):
     user = interaction.user
     guild = interaction.guild
-
-    prizes = [
-        {"name": "100 كوينز عادية", "coins": 100, "rarity": "عادي 🟢"},
-        {"name": "500 كوينز ممتازة", "coins": 500, "rarity": "ممتاز 🔵"},
-        {"name": "1500 كوينز أسطورية", "coins": 1500, "rarity": "أسطوري 🟡"},
-        {
-            "name": "👑 جائزة نادرة: 5000 كوينز + رتبة ملك الحظ",
-            "coins": 5000,
-            "rarity": "نادرة وحصرية 💎",
-        },
-        {"name": "صندوق فاضي (هواء طازة)", "coins": 0, "rarity": "منحوس 🔴"},
-    ]
-
-    won_prize = random.choice(prizes)
+    today_str = str(datetime.date.today())
 
     data = load_data()
     user_data = get_user_data(data, user.id)
 
+    # التحقق من فتح الصندوق مرة واحدة يومياً
+    if user_data.get("last_box_date") == today_str:
+      await interaction.response.send_message(
+          "❌ لا أنت تلعب على من! أقول روح.. فتحت صندوقك اليوم، تعال بكرة 🤨",
+          ephemeral=True,
+      )
+      return
+
+    user_data["last_box_date"] = today_str
+
+    # نظام الجوائز مع جعل رتبة ملك الحظ نادرة جداً وصعبة (نسبة ضعيفة جداً)
+    prizes = [
+        {"name": "صندوق فاضي (هواء طازة)", "coins": 0, "rarity": "منحوس 🔴", "is_role": False},
+        {"name": "50 كوينز خفيفة", "coins": 50, "rarity": "عادي 🟢", "is_role": False},
+        {"name": "150 كوينز ممتازة", "coins": 150, "rarity": "ممتاز 🔵", "is_role": False},
+        {"name": "500 كوينز أسطورية", "coins": 500, "rarity": "أسطوري 🟡", "is_role": False},
+        {"name": "👑 ملك الحظ (5000 كوينز + رتبة ملك الحظ)", "coins": 5000, "rarity": "نادرة جداً وصعبة 💎", "is_role": True},
+    ]
+    # أوزان الاحتمالات (تخلي الصندوق الفاضي والكوينز العادية أكثر شيوعاً، ورتبة ملك الحظ نادرة وصعبة)
+    weights = [45, 30, 15, 8, 2] # 2% فقط لملك الحظ
+
+    won_prize = random.choices(prizes, weights=weights, k=1)[0]
+
     if won_prize["coins"] > 0:
       user_data["coins"] += won_prize["coins"]
-      save_data(data)
 
+    save_data(data)
     current_balance = user_data["coins"]
 
-    if won_prize["coins"] == 5000:
+    if won_prize["is_role"]:
       role = guild.get_role(SPECIAL_ROLE_ID)
       if role:
         try:
           await user.add_roles(role)
           role_status = f"✅ وتم إعطاؤك رتبة **{role.name}** بنجاح!"
         except:
-          role_status = "⚠️ فزت بالرتبة بس البوت ما عنده صلاحية."
+          role_status = "⚠️ فزت بالرتبة بس البوت ما عنده صلاحية رتب."
       else:
         role_status = "⚠️ رتبة ملك الحظ غير موجودة أو الأيدي خطأ."
 
       reply_msg = (
-          "🚨 **يا إلهييي!** فتحت الصندوق وطاحت في يدك الكبرى:\n"
+          "🚨 **يا إلهييي!** مستحيل! فتحت الصندوق وطاحت في يدك الجائزة الكبرى:\n"
           f"**{won_prize['name']}**!\n{role_status} 🔥💎\nرصيدك الحالي:"
           f" **{current_balance:,} كوينز** 🏦"
       )
       log_color = 0x9B59B6
-      log_title = "📜 سجل المهام - 🏆 الحصول على جائزة نادرة ورتبة ملك الحظ!"
+      log_title = "📜 سجل الصناديق - 🏆 فوز أسطوري برتبة ملك الحظ!"
+
+      # إرسال رسالة علنية في الشات العام منشن للكل وللاعبي الرتبة
+      try:
+        await interaction.channel.send(
+            f"@everyone يا جماعة الخير! شوفوا الحظ الخرافي عند {user.mention}، فتح الصندوق وفاز برتبة **ملك الحظ**! 🔥👑 **اشفحو عليه تراه اخذ الرتبه!**"
+        )
+      except:
+        pass
 
     elif won_prize["coins"] == 0:
       reply_msg = (
-          "📦 فتحه.. والصندوق طلع **فاضي وهيوا صصافي**! حظاً أوفر مرة ثانية يا"
+          "📦 فتحه.. والصندوق طلع **فاضي وهواء صصافي**! حظاً أوفر مرة ثانية يا"
           f" منحوس 😂\nرصيدك الحالي: **{current_balance:,} كوينز** 🏦"
       )
       log_color = 0xED4245
-      log_title = "📜 سجل المهام - فتح صندوق"
+      log_title = "📜 سجل الصناديق - صندوق فارغ"
     else:
       reply_msg = (
           f"📦 فتحت الصندوق وطلع لك: **{won_prize['name']}**!\nرصيدك الجديد:"
           f" **{current_balance:,} كوينز** 🏦"
       )
       log_color = 0xF1C40F
-      log_title = "📜 سجل المهام - فتح صندوق"
+      log_title = "📜 سجل الصناديق - فتح صندوق"
 
     await interaction.response.send_message(reply_msg, ephemeral=True)
 
@@ -206,7 +254,6 @@ class TaskSystemCog(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-  # مجموعة الأوامر الفرعية تحت الأمر الرئيسي /task
   task_group = app_commands.Group(
       name="task", description="أوامر نظام المهام والصناديق اليومية"
   )
@@ -223,11 +270,12 @@ class TaskSystemCog(commands.Cog):
     embed = discord.Embed(
         title="🎯 لوحة المهام اليومية والصناديق",
         description=(
-            "مرحبًا بك في نظام المهام والصناديق العشوائية.\n\n"
+            "مرحبًا بك في نظام المهام والصناديق العشوائية الحصرية.\n\n"
             "✨ **ما يمكنك فعله هنا:**\n\n"
-            "• 🎁 إنجاز المهام واستلام **500 كوينز** (**تتجدد يومياً تلقائياً**).\n"
-            "• 📦 فتح الصناديق العشوائية (تنضاف كوينزاتها لحسابك البنكي أو"
-            " **رتبة ملك الحظ**!).\n\n"
+            "• 🎁 استلام **المهام الثلاث اليومية** و500 كوينز (تتجدد يومياً لكل"
+            " شخص).\n"
+            "• 📦 فتح **الصندوق العشوائي اليومي** (بحظك.. قد تفوز بكوينز أو"
+            " **رتبة ملك الحظ** النادرة والصعبة!).\n\n"
             "⬇️ **اختر أحد الأزرار بالأسفل:**"
         ),
         color=0x2B2D31,
@@ -235,7 +283,7 @@ class TaskSystemCog(commands.Cog):
 
     await target_channel.send(embed=embed, view=TaskButtons(self.bot))
     await interaction.response.send_message(
-        "✅ تم نشر لوحة المهام وربطها بالبنك وتفعيل التجديد اليومي بنجاح!",
+        "✅ تم نشر لوحة المهام وتطبيق الشروط والقواعد الجديدة بنجاح!",
         ephemeral=True,
     )
 
