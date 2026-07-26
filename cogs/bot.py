@@ -8,7 +8,7 @@ import openai
 class BotCog(commands.Cog):
   # إنشاء مجموعة الأوامر الرئيسية /voice
   voice_group = app_commands.Group(
-      name="voice", description="أوامر البوت الصوتي والذكاء الاصطناعي"
+      name="voice", description="أوامر البوت والذكاء الاصطناعي"
   )
 
   def __init__(self, bot):
@@ -20,11 +20,10 @@ class BotCog(commands.Cog):
         base_url="https://api.groq.com/openai/v1",
     )
 
-    # شخصية البوت (حارس بوابات ساخر بالعامية الخليجية)
+    # شخصية البوت (زاحف، طقطقة، ومستهبال بالعامية السعودية)
     self.BOT_PERSONALITY = """
-أنت حارس بوابات ساخر ومضحك، تتحدث بالعامية الخليجية/العربية. 
-تتفاعل مع الأعضاء بكوميديا خفيفة، ولا تعطيهم إجابات مباشرة بدون بعض التذمر الساخر والفكاهي.
-اجعل ردودك قصيرة جداً (لا تتجاوز جملتين).
+أنت بوت "زاحف" ومجنون، تحب الطقطقة والاستهبال والهياط وتتحدث بالعامية السعودية الحماسية والزاحفة.
+ردودك قصيرة، جريئة، فيها شوي استهبال وتطقطق على اللي يكلمك بسعة صدر. لا تصير رسمي أبداً!
 """
 
   @commands.Cog.listener()
@@ -39,12 +38,12 @@ class BotCog(commands.Cog):
 
   # أمر فرعي: /voice join
   @voice_group.command(
-      name="join", description="يدخل البوت إلى الروم الصوتي"
+      name="join", description="يطلب البوت للانضمام للروم"
   )
   async def join(self, interaction: discord.Interaction):
     if not interaction.user.voice:
       await interaction.response.send_message(
-          "❌ يجب أن تكون داخل روم صوتي أولاً!", ephemeral=True
+          "❌ يا الحبيب ادخل روم صوتي أول عشان أجي أفلها معك!", ephemeral=True
       )
       return
 
@@ -58,22 +57,24 @@ class BotCog(commands.Cog):
         await channel.connect(timeout=10.0)
 
       await interaction.followup.send(
-          "🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟"
+          "وه! وصل الزعيم، جهزوا السوالف والهياط!"
       )
     except Exception as e:
       await interaction.followup.send(
-          f"❌ فشل الاتصال بالروم. الخطأ: {e}", ephemeral=True
+          f"❌ علّق معي الوضع ما قدرت أخش: {e}", ephemeral=True
       )
 
   # أمر فرعي: /voice leave
-  @voice_group.command(name="leave", description="يغادر البوت الروم الصوتي")
+  @voice_group.command(name="leave", description="يطلب البوت مغادرة الروم")
   async def leave(self, interaction: discord.Interaction):
     if interaction.guild.voice_client:
       await interaction.guild.voice_client.disconnect()
-      await interaction.response.send_message("👋 أخيراً.. سأذهب لأستريح!")
+      await interaction.response.send_message(
+          "أصلاً طفشت، رايح أجيب لي شغلة وأرجع لكم!"
+      )
     else:
       await interaction.response.send_message(
-          "❌ أنا لست في أي روم صوتي حالياً.", ephemeral=True
+          "❌ يا صاحبي أنا أصلاً برا الروم، وش فيك تخرفن؟", ephemeral=True
       )
 
   # أمر فرعي: /voice talk
@@ -99,11 +100,11 @@ class BotCog(commands.Cog):
       print(f"رد الذكاء الاصطناعي: {ai_reply}")
 
       # إرسال الرد النصي في الشات مباشرة
-      await interaction.followup.send(f"💬 **البوت:** {ai_reply}")
+      await interaction.followup.send(f"💬 **البوت الزاحف:** {ai_reply}")
 
     except Exception as e:
       await interaction.followup.send(
-          f"حدث خطأ أثناء المعالجة: {e}", ephemeral=True
+          f"صار خطأ يا وحش: {e}", ephemeral=True
       )
 
 
