@@ -38,6 +38,9 @@ class BotCog(commands.Cog):
             await interaction.response.send_message("❌ يجب أن تكون داخل روم صوتي أولاً!", ephemeral=True)
             return
 
+        # تأجيل الرد فوراً لمنع خطأ انتهاء المهلة (The application did not respond)
+        await interaction.response.defer()
+
         channel = interaction.user.voice.channel
         
         if interaction.guild.voice_client:
@@ -45,7 +48,7 @@ class BotCog(commands.Cog):
         else:
             await channel.connect()
             
-        await interaction.response.send_message("🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟")
+        await interaction.followup.send("🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟")
 
     # أمر فرعي: /voice leave
     @voice_group.command(name="leave", description="يغادر البوت الروم الصوتي")
