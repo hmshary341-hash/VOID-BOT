@@ -23,6 +23,12 @@ class BotCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        try:
+            # مزامنة أوامر السلاش مع ديسكورد فور إقلاع البوت
+            synced = await self.bot.tree.sync()
+            print(f"✅ تمت مزامنة {len(synced)} من أوامر السلاش بنجاح.")
+        except Exception as e:
+            print(f"❌ خطأ في مزامنة الأوامر: {e}")
         print(f"✅ تم تفعيل cog البوت الصوتي (أوامر فرعية تحت /voice) بنجاح")
 
     # أمر فرعي: /voice join
