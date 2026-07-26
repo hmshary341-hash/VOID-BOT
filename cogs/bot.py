@@ -6,8 +6,6 @@ import os
 class BotCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # آيدي الروم المسموح للبوت العمل فيه فقط
-        self.TARGET_CHANNEL_ID = 1530053011861278741
         
         # إعداد واجهة OpenAI
         self.client_ai = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -21,24 +19,23 @@ class BotCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print(f"✅ تم تفعيل cog البوت الصوتي بنجاح")
-        print(f"🔒 الروم المقيد للعمل: {self.TARGET_CHANNEL_ID}")
+        print(f"✅ تم تفعيل cog البوت الصوتي بنجاح (بدون قيود على الروم)")
 
-    # أمر الدخول للصوت (-join)
+    # أمر الدخول للصوت (-join) - يعمل في أي روم بدون شروط
     @commands.command(name="join")
     async def join(self, ctx):
         if not ctx.author.voice:
-            await ctx.send("❌ يجب أن تكون داخل روم صوتي!")
+            await ctx.send("❌ يجب أن تكون داخل روم صوتي أولاً!")
             return
 
         channel = ctx.author.voice.channel
         
-        # التحقق من أن الروم هو المخصص فقط
-        if channel.id != self.TARGET_CHANNEL_ID:
-            await ctx.send("❌ عذراً، مسموح لي بالعمل في الروم المخصص لي فقط!")
-            return
-
-        await channel.connect()
+        # إذا كان البوت متصلاً بروم آخر، يخرج منه أولاً ثم يدخل رومك
+        if ctx.voice_client:
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
+            
         await ctx.send("🤖 دخلت الروم، من يعكر صفو هدوئي الآن؟")
 
     # أمر المغادرة للصوت (-leave)
@@ -50,12 +47,12 @@ class BotCog(commands.Cog):
         else:
             await ctx.send("❌ أنا لست في أي روم صوتي حالياً.")
 
-    # أمر التحدث والرد الصوتي (-talk [النص])
+    # أمر التحدث والرد الصوتي (-talk [النص]) - يعمل طالما البوت في روم صوتي
     @commands.command(name="talk")
     async def talk(self, ctx, *, message: str):
-        # التحقق من أن البوت متصل بالروم الصوتي المخصص
-        if not ctx.voice_client or ctx.voice_client.channel.id != self.TARGET_CHANNEL_ID:
-            await ctx.send("❌ لا أستطيع العمل هنا! أنا مخصص للروم الصوتي المحدد فقط.")
+        # التحقق فقط من أن البوت متصل بصوت (بدون تقييد بروم محدد)
+        if not ctx.voice_client:
+            await ctx.send("❌ يا ابن الحلال، دخلني الروم الصوتي أولاً باستخدام `-join`!")
             return
 
         async with ctx.typing():
