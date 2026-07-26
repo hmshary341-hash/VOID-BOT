@@ -1,0 +1,183 @@
+import asyncio
+import json
+import os
+import random
+import time
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
+from openai import AsyncOpenAI
+
+# مسار ملف البيانات في المجلد الرئيسي (بما أن الملف داخل مجلد cogs)
+DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "server_data.json")
+
+# --- نظام الذاكرة المتقدم ---
+class ChatMemory:
+    def __init__(self):
+        self.messages = []  # يتسع لآخر 30 رسالة
+        self.user_last_questions = {}  
+        self.known_members = set()
+
+    def add_message(self, user_name, user_id, content):
+        self.known_members.add(user_name)
+        self.messages.append({"role": "user", "name": user_name, "content": content})
+        if len(self.messages) > 30:
+            self.messages.pop(0)
+            
+        if user_id not in self.user_last_questions:
+            self.user_last_questions[user_id] = []
+        self.user_last_questions[user_id].append(content)
+        if len(self.user_last_questions[user_id]) > 2:
+            self.user_last_questions[user_id].pop(0)
+
+class Oracle(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        self.memory = ChatMemory()
+        self.oracle_enabled = True
+        self.custom_system_prompt = None
+        self.server_data = self.load_server_data()
+        self.last_message_time = time.time()
+        self.IDLE_THRESHOLD = 20 * 60  # 20 دقيقة
+        self.IDLE_MESSAGES = [
+            "إلا صدق، وينكم يا جماعة؟ الشات صاير كنه مقبرة 🥷😂",
+            "يا عيال وش السالفة؟ تحسّون الكل صامدين اليوم 👀",
+            "محد يبي يلعب ولا يسولف؟ ترا طفش لحالي هههههه ☕",
+            "يا إداريين ويا أعضاء، اصحوا! وين الحماس؟ 🔥"
+        ]
+        self.check_chat_idle.start()
+
+    def cog_unload(self):
+        self.check_chat_idle.cancel()
+
+    def load_server_data(self):
+        if not os.path.exists(DATA_FILE):
+            return {}
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"❌ خطأ في تحميل ملف server_data.json: {e}")
+            return {}
+
+    def get_system_prompt(self):
+        if self.custom_system_prompt:
+            return self.custom_system_prompt
+        
+        return f"""
+أنت اسمك Oracle، عضو حقيقي تماماً داخل سيرفر ديسكورد ولست بوت تقليدي.
+معلومات السيرفر وقاعدة المعرفة الخاصة بك هي كالتالي (هذه هي الحقيقة المطلقة، لا تخمن أبدًا خارجها):
+{json.dumps(self.server_data, ensure_ascii=False)}
+
+قواعد شخصيتك وتصرفاتك:
+1. تصرف كعضو حقيقي، تحب المزاح بخفة دم، تحترم الجميع، ولا تزعج الشات.
+2. لا تكرر الردود أبداً، ونوع في استخدام الإيموجيات ولا تستخدم نفس الشكل دائماً.
+3. تفهم اللهجة السعودية جيداً، وتتعامل باللغتين العربية والإنجليزية بطلاقة.
+4. قاعدة صارمة جداً: إذا سأل أي عضو عن شيء موجود داخل قاعدة المعرفة (server_data.json)، أجب منه بدقة. إذا لم تجد المعلومة أبداً، قل حرفياً وبكل بساطة أنك لا تعرفها ولا تخمن أبداً!
+5. حافظ على ردود سريعة ومختصرة وذكية.
+"""
+
+    @commands.Cog.listener()
+    async def on_member_join(self, member):
+        general_channel = discord.utils.get(member.guild.text_channels, name="general") or member.guild.system_channel
+        if general_channel:
+            await general_channel.send(f"يا هلا والله بـ {member.mention} أنار السيرفر ونورنا! حياك بين إخوانك 🌹✨")
+
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        if message.author.bot or not message.guild:
+            return
+
+        self.last_message_time = time.time()
+        self.memory.add_message(message.author.display_name, message.author.id, message.content)
+
+        if self.bot.user.mentioned_in(message) and self.oracle_enabled:
+            async with message.channel.typing():
+                try:
+                    messages_payload = [{"role": "system", "content": self.get_system_prompt()}]
+                    
+                    for m in self.memory.messages[-10:]:
+                        messages_payload.append({"role": "user", "content": f"{m['name']}: {m['content']}"})
+                    
+                    messages_payload.append({"role": "user", "content": f"{message.author.display_name}: {message.content}"})
+
+                    response = await self.client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=messages_payload,
+                        temperature=0.7,
+                        max_tokens=300
+                    )
+                    
+                    reply_text = response.choices[0].message.content
+                    await message.reply(reply_text)
+                except Exception as e:
+                    print(f"❌ خطأ في الرد بالذكاء الاصطناعي: {e}")
+                    await message.channel.send("أوه، صار فيه لخبطة بسيطة عندي، دقايق وأرجع أروق! 😅")
+
+    @tasks.loop(minutes=1)
+    async def check_chat_idle(self):
+        if not self.oracle_enabled:
+            return
+        
+        if time.time() - self.last_message_time > self.IDLE_THRESHOLD:
+            for guild in self.bot.guilds:
+                for channel in guild.text_channels:
+                    if "general" in channel.name or "الشات" in channel.name:
+                        chosen_msg = random.choice(self.IDLE_MESSAGES)
+                        try:
+                            await channel.send(chosen_msg)
+                            self.last_message_time = time.time()
+                        except Exception:
+                            pass
+                        break
+
+    @check_chat_idle.before_loop
+    async def before_check_chat_idle(self):
+        await self.bot.wait_until_ready()
+
+    @app_commands.command(name="oracle", description="لوحة تحكم إعدادات أوراكل (للأونر فقط)")
+    @app_commands.describe(
+        action="اختر الإجراء المطلوبة",
+        value="قيمة التغيير (حسب الأمر المطلوب)"
+    )
+    @app_commands.choices(action=[
+        app_commands.Choice(name="on", value="on"),
+        app_commands.Choice(name="off", value="off"),
+        app_commands.Choice(name="personality", value="personality"),
+        app_commands.Choice(name="channel", value="channel"),
+        app_commands.Choice(name="memory", value="memory"),
+        app_commands.Choice(name="prompt", value="prompt"),
+        app_commands.Choice(name="reload", value="reload")
+    ])
+    async def oracle_admin(self, interaction: discord.Interaction, action: str, value: str = None):
+        if interaction.user != interaction.guild.owner:
+            await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص لصاحب السيرفر (Owner) فقط!", ephemeral=True)
+            return
+
+        if action == "on":
+            self.oracle_enabled = True
+            await interaction.response.send_message("🟢 تم تفعيل نظام تفاعل أوراكل بنجاح.", ephemeral=True)
+        elif action == "off":
+            self.oracle_enabled = False
+            await interaction.response.send_message("🔴 تم إيقاف نظام تفاعل أوراكل مؤقتاً.", ephemeral=True)
+        elif action == "reload":
+            self.server_data = self.load_server_data()
+            await interaction.response.send_message("🔄 تمت إعادة تحميل قاعدة المعرفة (server_data.json) بنجاح!", ephemeral=True)
+        elif action == "memory":
+            msg_count = len(self.memory.messages)
+            members_count = len(self.memory.known_members)
+            await interaction.response.send_message(f"🧠 **حالة الذاكرة:**\n- الرسائل المخزنة: {msg_count}/30\n- الأعضاء المتسجلين بالذاكرة: {members_count}", ephemeral=True)
+        elif action == "prompt":
+            if not value:
+                await interaction.response.send_message(f"📜 **الـ Prompt الحالي:**\n```json\n{self.get_system_prompt()[:1500]}...\n```", ephemeral=True)
+            else:
+                self.custom_system_prompt = value
+                await interaction.response.send_message("✨ تم تحديث الـ Prompt بنجاح!", ephemeral=True)
+        elif action == "channel":
+            await interaction.response.send_message(f"📌 الإعداد الحالي يعمل في كافة الرومات المتاحة.", ephemeral=True)
+        elif action == "personality":
+            await interaction.response.send_message("🎭 شخصية أوراكل مصممة خصيصاً باللهجة السعودية وبروح مرحة وغير مزعجة.", ephemeral=True)
+
+async def setup(bot):
+    await bot.add_cog(Oracle(bot))
