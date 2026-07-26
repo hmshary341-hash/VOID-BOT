@@ -4,13 +4,16 @@ from discord import app_commands
 import json
 import os
 import asyncio
+import sqlite3
+from datetime import date
 
 # --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات ---
 DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "economy.json")
+DB_PATH = "streaks.db"  # قاعدة بيانات الستريك المشتركة
 
-# --- أسعار وأتمتة المنتجات والآي ديَات المحدثة ---
+# --- أسعار وأتمتة المنتجات ---
 ROLES_SHOP = {
     "ultra": {"name": "Ultra", "price": 75000, "role_id": 1530402702914490420},
     "premio": {"name": "Premio", "price": 55000, "role_id": 1530404996451930153},
@@ -22,6 +25,10 @@ ROLES_SHOP = {
 TITLES_SHOP = {
     "king": {"name": "King", "price": 60000, "role_id": 1530407131507986554},
     "queen": {"name": "Queen", "price": 60000, "role_id": 1530407411335172188}
+}
+
+NEEDS_SHOP = {
+    "shield": {"name": "درع حماية الستريك", "price": 500, "max_daily": 2}
 }
 
 def load_data():
@@ -61,14 +68,22 @@ def deduct_user_coins(user_id, amount):
 class PurchaseSelect(discord.ui.Select):
     def __init__(self, shop_type: str):
         self.shop_type = shop_type
-        items = ROLES_SHOP if shop_type == "roles" else TITLES_SHOP
+        if shop_type == "roles":
+            items = ROLES_SHOP
+        elif shop_type == "titles":
+            items = TITLES_SHOP
+        else:
+            items = NEEDS_SHOP
         
         options = []
         for key, item in items.items():
+            desc = f"السعر: {item['price']:,} كوينز"
+            if shop_type == "needs":
+                desc += " (حد أقصى درعين يومياً)"
             options.append(
                 discord.SelectOption(
                     label=item["name"],
-                    description=f"السعر: {item['price']:,} كوينز",
+                    description=desc,
                     value=key
                 )
             )
@@ -76,8 +91,13 @@ class PurchaseSelect(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
         item_key = self.values[0]
-        items_dict = ROLES_SHOP if self.shop_type == "roles" else TITLES_SHOP
-        item = items_dict[item_key]
+        
+        if self.shop_type == "roles":
+            item = ROLES_SHOP[item_key]
+        elif self.shop_type == "titles":
+            item = TITLES_SHOP[item_key]
+        else:
+            item = NEEDS_SHOP[item_key]
         
         user_coins = get_user_coins(interaction.user.id)
         price = item["price"]
@@ -89,25 +109,70 @@ class PurchaseSelect(discord.ui.Select):
             )
             return
 
-        # خصم الكوينز وحفظها في الفوليوم
+        # فحص الحد اليومي للدروع في جدول قاعدة البيانات المشتركة
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        today = str(date.today())
+        
+        if self.shop_type == "needs":
+            cursor.execute(
+                "SELECT streak_count, last_date, shields, last_shield_date, shield_bought_today FROM streaks WHERE user_id = ? AND guild_id = ?",
+                (interaction.user.id, interaction.guild.id)
+            )
+            result = cursor.fetchone()
+            
+            bought_today = 0
+            if result:
+                last_s_date = result[3]
+                bought_today = result[4] if result[4] is not None else 0
+                if last_s_date != today:
+                    bought_today = 0 # تصفير العداد إذا بدأ يوم جديد
+
+            if bought_today >= item["max_daily"]:
+                conn.close()
+                await interaction.response.send_message(
+                    f"❌ لقد وصلت إلى الحد الأقصى لشراء الدروع اليوم (**{item['max_daily']} دروع** كحد أقصى يومياً). عُد غداً!",
+                    ephemeral=True
+                )
+                return
+
+        # خصم الكوينز
         deduct_user_coins(interaction.user.id, price)
 
-        # محاولة إعطاء الرتبة تلقائياً
         role_given = False
-        if item["role_id"] != 0:
-            role = interaction.guild.get_role(item["role_id"])
-            if role:
-                try:
-                    await interaction.user.add_roles(role)
-                    role_given = True
-                except Exception as e:
-                    print(f"❌ خطأ في إعطاء الرتبة: {e}")
-
         msg = f"🎉 مبروك! لقد اشتريت **{item['name']}** بنجاح مقابل **{price:,} كوينز**."
-        if role_given:
-            msg += "\n✨ تم منحك الرتبة تلقائياً وسيتم حذف التذكرة..."
+
+        if self.shop_type in ["roles", "titles"]:
+            if item["role_id"] != 0:
+                role = interaction.guild.get_role(item["role_id"])
+                if role:
+                    try:
+                        await interaction.user.add_roles(role)
+                        role_given = True
+                    except Exception as e:
+                        print(f"❌ خطأ في إعطاء الرتبة: {e}")
+            if role_given:
+                msg += "\n✨ تم منحك الرتبة تلقائياً وسيتم حذف التذكرة..."
+            else:
+                msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
         else:
-            msg += "\n📌 تم خصم المبلغ، وسيتم حذف هذه التذكرة تلقائياً..."
+            # إضافة درع وتحديث سجل الشراء اليومي في قاعدة بيانات الستريك
+            if result is None:
+                cursor.execute(
+                    "INSERT INTO streaks (user_id, guild_id, streak_count, last_date, shields, last_shield_date, shield_bought_today) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (interaction.user.id, interaction.guild.id, 0, "", 1, today, 1)
+                )
+            else:
+                new_shields = result[2] + 1
+                new_bought = (bought_today + 1)
+                cursor.execute(
+                    "UPDATE streaks SET shields = ?, last_shield_date = ?, shield_bought_today = ? WHERE user_id = ? AND guild_id = ?",
+                    (new_shields, today, new_bought, interaction.user.id, interaction.guild.id)
+                )
+            conn.commit()
+            msg += "\n🛡️ تمت إضافة الدرع إلى ملف الستريك الخاص بك بنجاح وسيتم حذف التذكرة..."
+
+        conn.close()
 
         # الرد على المستخدم
         await interaction.response.send_message(msg, ephemeral=False)
@@ -134,7 +199,7 @@ class StoreView(discord.ui.View):
         custom_id="roles_store"
     )
     async def roles_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_store_ticket(interaction, "متجر-الرتب", is_roles=True)
+        await self.create_store_ticket(interaction, "متجر-الرتب", "roles")
 
     @discord.ui.button(
         label="افتح متجر الألقاب", 
@@ -142,9 +207,17 @@ class StoreView(discord.ui.View):
         custom_id="titles_store"
     )
     async def titles_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.create_store_ticket(interaction, "متجر-الألقاب", is_roles=False)
+        await self.create_store_ticket(interaction, "متجر-الألقاب", "titles")
 
-    async def create_store_ticket(self, interaction: discord.Interaction, store_name: str, is_roles: bool):
+    @discord.ui.button(
+        label="إحتياجات الأعضاء", 
+        style=discord.ButtonStyle.secondary, 
+        custom_id="needs_store"
+    )
+    async def needs_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.create_store_ticket(interaction, "إحتياجات-الأعضاء", "needs")
+
+    async def create_store_ticket(self, interaction: discord.Interaction, store_name: str, shop_type: str):
         await interaction.response.defer(ephemeral=True)
 
         guild = interaction.guild
@@ -164,7 +237,6 @@ class StoreView(discord.ui.View):
             )
         }
 
-        # اسم الروم أصبح باسم المتجر فقط بدون اسم المستخدم
         channel = await guild.create_text_channel(
             name=store_name,
             category=category,
@@ -173,10 +245,9 @@ class StoreView(discord.ui.View):
 
         await interaction.followup.send(f"تم فتح تذكرتك بنجاح: {channel.mention}", ephemeral=True)
 
-        shop_type = "roles" if is_roles else "titles"
         view = PurchaseView(shop_type)
 
-        if is_roles:
+        if shop_type == "roles":
             await channel.send(
                 f"أهلاً بك يا {user.mention} في **متجر الرتب**!\n"
                 "إليك قائمة الرتب المتاحة للشراء:\n\n"
@@ -188,7 +259,7 @@ class StoreView(discord.ui.View):
                 "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
                 view=view
             )
-        else:
+        elif shop_type == "titles":
             await channel.send(
                 f"أهلاً بك يا {user.mention} في **متجر الألقاب**!\n"
                 "إليك قائمة الألقاب المتاحة للشراء:\n\n"
@@ -197,12 +268,20 @@ class StoreView(discord.ui.View):
                 "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
                 view=view
             )
+        else:
+            await channel.send(
+                f"أهلاً بك يا {user.mention} في قسم **إحتياجات الأعضاء**!\n"
+                "إليك المنتجات المتاحة:\n\n"
+                "🛡️ **درع حماية الستريك** - السعر: 500 كوينز *(حد أقصى درعين يومياً)*\n\n"
+                "👇 **يمكنك الشراء مباشرة عبر القائمة أدناه:**",
+                view=view
+            )
 
 class Shop(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="store", description="إرسال لوحة متجر الرتب والألقاب")
+    @app_commands.command(name="store", description="إرسال لوحة متجر السيرفر")
     @app_commands.default_permissions(administrator=True)
     async def store_panel(self, interaction: discord.Interaction):
         view = StoreView()
