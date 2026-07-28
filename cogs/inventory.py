@@ -3,352 +3,238 @@ from discord import app_commands
 from discord.ext import commands
 import json
 import os
+import random
+from datetime import date
 
-DATA_FILE = "inventory.json"
+DATA_DIR = "/app/data"
+os.makedirs(DATA_DIR, exist_ok=True)
+INVENTORY_FILE = os.path.join(DATA_DIR, "inventory.json")
 
-# ==========================================
-# 📂 دوال التحميل والحفظ والربط مع المتجر (JSON Functions)
-# ==========================================
-def load_data():
-    """تحميل البيانات من ملف inventory.json"""
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
+# نسب الرتب لكل صندوق
+CHEST_RATES = {
+    "الشائع": {"Tempest": 2.0, "Nebula": 0.5, "Obsidian": 0.1},
+    "غير الشائع": {"Tempest": 7.0, "Nebula": 2.0, "Obsidian": 0.5},
+    "النادر": {"Tempest": 15.0, "Nebula": 5.0, "Obsidian": 1.0},
+    "الإيبك": {"Tempest": 25.0, "Nebula": 10.0, "Obsidian": 3.0},
+    "الميثك": {"Tempest": 40.0, "Nebula": 20.0, "Obsidian": 5.0}
+}
+
+def load_inventory():
+    if not os.path.exists(INVENTORY_FILE):
+        with open(INVENTORY_FILE, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        try:
+    try:
+        with open(INVENTORY_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-        except json.JSONDecodeError:
-            return {}
+    except json.JSONDecodeError:
+        return {}
 
-def save_data(data):
-    """حفظ البيانات إلى ملف inventory.json"""
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
+def save_inventory(data):
+    with open(INVENTORY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-def get_user_data(user_id):
-    """جلب بيانات العضو أو إنشاء بيانات فارغة نظيفة إن لم تكن موجودة"""
-    data = load_data()
+def get_user_inventory(user_id):
+    data = load_inventory()
     uid = str(user_id)
+    today = str(date.today())
+    
     if uid not in data:
         data[uid] = {
-            "titles": [],          # الألقاب النصية المملوكة (مثل King, Queen)
-            "active_title": None,  # اللقب النصي المفعل حالياً
-            "ranks": [],           # الرتب المملوكة في الحقيبة
-            "boxes": {             # الصناديق المملوكة
-                "الشائع": 0,
-                "غير الشائع": 0,
-                "النادر": 0,
-                "الإيبك": 0,
-                "الميثك": 0
-            }
+            "boxes": {"الشائع": 0, "غير الشائع": 0, "النادر": 0, "الإيبك": 0, "الميثك": 0},
+            "ranks": [],
+            "titles": [],
+            "active_rank": None,
+            "active_title": None,
+            "coins": 0,
+            "xp": 0,
+            "daily_chests": {"date": today, "الشائع": False, "غير الشائع": False, "النادر": False, "الإيبك": False, "الميثك": False}
         }
-        save_data(data)
+        save_inventory(data)
+    else:
+        user_data = data[uid]
+        if "daily_chests" not in user_data or user_data["daily_chests"].get("date") != today:
+            user_data["daily_chests"] = {"date": today, "الشائع": False, "غير الشائع": False, "النادر": False, "الإيبك": False, "الميثك": False}
+            save_inventory(data)
+            
     return data[uid]
 
-def update_user_data(user_id, user_data):
-    """تحديث بيانات العضو في ملف الحفظ"""
-    data = load_data()
+def update_user_inventory(user_id, user_data):
+    data = load_inventory()
     data[str(user_id)] = user_data
-    save_data(data)
+    save_inventory(data)
 
-# 🔗 دوال مساعدة لربط المتجر (Shop) بالحقيبة:
-def add_title_to_inventory(user_id, title_name):
-    """إضافة لقب نصي للعضو عند شرائه من متجر الألقاب"""
-    user_data = get_user_data(user_id)
-    if title_name not in user_data["titles"]:
-        user_data["titles"].append(title_name)
-        update_user_data(user_id, user_data)
+def add_box_to_inventory(user_id, chest_name, count=1):
+    user_data = get_user_inventory(user_id)
+    if "boxes" not in user_data:
+        user_data["boxes"] = {"الشائع": 0, "غير الشائع": 0, "النادر": 0, "الإيبك": 0, "الميثك": 0}
+    user_data["boxes"][chest_name] = user_data["boxes"].get(chest_name, 0) + count
+    update_user_inventory(user_id, user_data)
 
 def add_rank_to_inventory(user_id, rank_name):
-    """إضافة رتبة للعضو عند شرائها من متجر الرتب"""
-    user_data = get_user_data(user_id)
+    user_data = get_user_inventory(user_id)
+    if "ranks" not in user_data:
+        user_data["ranks"] = []
     if rank_name not in user_data["ranks"]:
         user_data["ranks"].append(rank_name)
-        update_user_data(user_id, user_data)
+        update_user_inventory(user_id, user_data)
 
-def add_box_to_inventory(user_id, box_name, amount=1):
-    """إضافة صندوق للعضو عند شرائه من المتجر"""
-    user_data = get_user_data(user_id)
-    if box_name in user_data["boxes"]:
-        user_data["boxes"][box_name] += amount
+def add_title_to_inventory(user_id, title_name):
+    user_data = get_user_inventory(user_id)
+    if "titles" not in user_data:
+        user_data["titles"] = []
+    if title_name not in user_data["titles"]:
+        user_data["titles"].append(title_name)
+        update_user_inventory(user_id, user_data)
+
+
+# --- دوال فتح الصناديق ---
+async def open_chest_logic(interaction: discord.Interaction, chest_name: str):
+    user_id = interaction.user.id
+    user_data = get_user_inventory(user_id)
+    
+    # التحقق مما إذا كان يملك الصندوق (لو مهو معه يقوله توكل بس)
+    if user_data["boxes"].get(chest_name, 0) <= 0:
+        await interaction.response.send_message(f"❌ توكل بس! ما معك صندوق **{chest_name}** 😂", ephemeral=True)
+        return
+
+    # خصم صندوق واحد
+    user_data["boxes"][chest_name] -= 1
+    
+    roll = random.uniform(0, 100)
+    rates = CHEST_RATES.get(chest_name, {})
+    
+    reward_text = ""
+    current_prob = 0.0
+    matched_rank = None
+    
+    for rank_name, chance in rates.items():
+        current_prob += chance
+        if roll <= current_prob:
+            matched_rank = rank_name
+            break
+
+    if matched_rank:
+        if matched_rank in user_data.get("ranks", []):
+            reward_text = f"🏷️ الرتبة: **{matched_rank}**\n⚠️ توكل الرتبة معك يلا روح 😂 *(كنت تمتلكها مسبقاً ولم تحصل على تعويض)*"
+        else:
+            user_data["ranks"].append(matched_rank)
+            reward_text = f"🎉 مبروك! حصلت على رتبة جديدة: **{matched_rank}** 🏷️"
     else:
-        user_data["boxes"][box_name] = amount
-    update_user_data(user_id, user_data)
-
-
-# ==========================================
-# 🎒 الواجهة الأساسية (Persistent View للوحة)
-# ==========================================
-class InventorySetupView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="🎒 فتح الانفنتوري", style=discord.ButtonStyle.blurple, custom_id="persistent:open_inventory_main")
-    async def open_inventory(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(
-            content="أهلاً بك في حقيبتك الخاصة ✨\nمن هنا يمكنك إدارة ممتلكاتك:",
-            view=InventoryMainMenuView(),
-            ephemeral=True
-        )
-
-
-# ==========================================
-# 🗂️ قائمة الخيارات الرئيسية للانفنتوري
-# ==========================================
-class InventoryMainMenuView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-
-    @discord.ui.button(label="🪪 ألقابي", style=discord.ButtonStyle.secondary, custom_id="menu:titles_btn")
-    async def titles_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_data = get_user_data(interaction.user.id)
-        titles = user_data.get("titles", [])
-        active_title = user_data.get("active_title")
-
-        desc = "🪪 **ألقابك النصية:**\n\n"
-        if titles:
-            for t in titles:
-                status = " (مفعل ✨)" if t == active_title else " (في الحقيبة)"
-                desc += f"• {t}{status}\n"
+        reward_type = random.choice(["coins", "xp"])
+        if reward_type == "coins":
+            multiplier = {"الشائع": 1, "غير الشائع": 3, "النادر": 8, "الإيبك": 20, "الميثك": 50}.get(chest_name, 1)
+            won_coins = random.randint(500, 2000) * multiplier
+            user_data["coins"] = user_data.get("coins", 0) + won_coins
+            reward_text = f"💰 كوينز: **+{won_coins:,}** كوينز"
         else:
-            desc += "لا توجد ألقاب لديك حالياً (قم بشرائها من متجر الألقاب).\n"
+            multiplier = {"الشائع": 1, "غير الشائع": 2, "النادر": 5, "الإيبك": 12, "الميثك": 30}.get(chest_name, 1)
+            won_xp = random.randint(100, 500) * multiplier
+            user_data["xp"] = user_data.get("xp", 0) + won_xp
+            reward_text = f"⭐ نقاط خبرة XP: **+{won_xp:,}** XP"
 
-        view = TitlesView(user_data, interaction.user)
-        await interaction.response.edit_message(content=desc, view=view)
+    update_user_inventory(user_id, user_data)
 
-    @discord.ui.button(label="🏷️ رتبي", style=discord.ButtonStyle.secondary, custom_id="menu:ranks_btn")
-    async def ranks_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_data = get_user_data(interaction.user.id)
+    embed = discord.Embed(
+        title=f"🎁 نتيجة فتح صندوق [{chest_name}]",
+        description=f"لقد قمت بفتح صندوق **{chest_name}** بنجاح!\n\n**الجائزة المحصول عليها:**\n{reward_text}",
+        color=discord.Color.gold()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+
+# --- واجهات الانفنتوري والأزرار ---
+class ChestSelect(discord.ui.Select):
+    def __init__(self, user_boxes):
+        options = []
+        for chest_name, count in user_boxes.items():
+            options.append(
+                discord.SelectOption(
+                    label=f"صندوق {chest_name}",
+                    description=f"المتوفر في حقيبتك: {count}",
+                    value=chest_name,
+                    emoji="📦"
+                )
+            )
+        super().__init__(placeholder="اختر الصندوق الذي تريد فتحه...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_chest = self.values[0]
+        await open_chest_logic(interaction, selected_chest)
+
+class ChestsOpenView(discord.ui.View):
+    def __init__(self, user_boxes):
+        super().__init__(timeout=180)
+        self.add_item(ChestSelect(user_boxes))
+
+
+class InventoryMainView(discord.ui.View):
+    def __init__(self, user_id):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+
+    @discord.ui.button(label="📦 صناديقي", style=discord.ButtonStyle.primary, custom_id="inv_boxes")
+    async def boxes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
+            return
+        
+        user_data = get_user_inventory(self.user_id)
+        user_boxes = user_data.get("boxes", {})
+        
+        total_boxes = sum(user_boxes.values())
+        if total_boxes <= 0:
+            await interaction.response.send_message("❌ حقيبتك خالية تماماً من الصناديق!", ephemeral=True)
+            return
+
+        view = ChestsOpenView(user_boxes)
+        box_text = "\n".join([f"📦 **{name}**: {count}x" for name, count in user_boxes.items()])
+        await interaction.response.send_message(f"🎁 **صنايقك:**\n{box_text}\n\nاختر الصندوق الذي تود فتحه:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="🏷️ رتبك", style=discord.ButtonStyle.secondary, custom_id="inv_ranks")
+    async def ranks_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
+            return
+        
+        user_data = get_user_inventory(self.user_id)
         ranks = user_data.get("ranks", [])
-        user_role_names = [role.name for role in interaction.user.roles] if isinstance(interaction.user, discord.Member) else []
-
-        desc = "🏷️ **رتبك:**\n\n"
-        if ranks:
-            for r in ranks:
-                is_active = r in user_role_names
-                status = " (مفعلة في السيرفر ✨)" if is_active else " (في الحقيبة غير مفعلة)"
-                desc += f"• {r}{status}\n"
-        else:
-            desc += "لا توجد رتب في حقيبتك حالياً.\n"
-
-        view = RanksView(user_data, interaction.user, ranks)
-        await interaction.response.edit_message(content=desc, view=view)
-
-    @discord.ui.button(label="🎁 صناديقي", style=discord.ButtonStyle.secondary, custom_id="menu:boxes_btn")
-    async def boxes_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
-        user_data = get_user_data(interaction.user.id)
-        boxes = user_data.get("boxes", {})
-
-        desc = "🎁 **صناديقك:**\n\n"
-        for b_name, b_count in boxes.items():
-            desc += f"📦 {b_name} ×{b_count}\n"
-
-        view = BoxesView(user_data, interaction.user)
-        await interaction.response.edit_message(content=desc, view=view)
-
-
-# ==========================================
-# 🪪 قائمة وإدارة الألقاب النصية البحتة
-# ==========================================
-class TitlesSelect(discord.ui.Select):
-    def __init__(self, titles, active_title):
-        options = []
-        for t in titles:
-            is_active = (t == active_title)
-            options.append(discord.SelectOption(label=t, description="مفعل حالياً ✨" if is_active else "موجود في حقيبتك", emoji="🪪"))
-        if not options:
-            options.append(discord.SelectOption(label="لا توجد ألقاب", value="none"))
-        super().__init__(placeholder="اختر لقباً...", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        self.view.selected_title = self.values[0]
-        await interaction.response.defer()
-
-class TitlesView(discord.ui.View):
-    def __init__(self, user_data, user):
-        super().__init__(timeout=180)
-        self.user_data = user_data
-        self.user = user
-        self.selected_title = None
-        self.add_item(TitlesSelect(user_data.get("titles", []), user_data.get("active_title")))
-
-    @discord.ui.button(label="✅ تفعيل اللقب", style=discord.ButtonStyle.success, row=1)
-    async def activate_title(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_title or self.selected_title == "none":
-            return await interaction.response.send_message("❌ الرجاء اختيار لقب من القائمة أولاً!", ephemeral=True)
+        if not ranks:
+            await interaction.response.send_message("❌ لا تمتلك أي رتب في حقيبتك!", ephemeral=True)
+            return
         
-        self.user_data["active_title"] = self.selected_title
-        update_user_data(self.user.id, self.user_data)
-        await interaction.response.send_message(f"✅ تم تفعيل اللقب النصي: **{self.selected_title}** بنجاح!", ephemeral=True)
+        ranks_text = "\n".join([f"• {r}" for r in ranks])
+        await interaction.response.send_message(f"🏷️ **رتبك في الحقيبة:**\n{ranks_text}", ephemeral=True)
 
-    @discord.ui.button(label="❌ إلغاء تفعيل اللقب", style=discord.ButtonStyle.danger, row=1)
-    async def deactivate_title(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_title or self.selected_title == "none":
-            return await interaction.response.send_message("❌ الرجاء اختيار لقب من القائمة أولاً!", ephemeral=True)
+    @discord.ui.button(label="🗑️ إزالة العناصر", style=discord.ButtonStyle.danger, custom_id="inv_remove")
+    async def remove_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
+            return
         
-        if self.user_data.get("active_title") == self.selected_title:
-            self.user_data["active_title"] = None
-            update_user_data(self.user.id, self.user_data)
-            await interaction.response.send_message(f"❌ تم إلغاء تفعيل اللقب: **{self.selected_title}** (لا يزال محفوظاً في حقيبتك ولم يُحذف).", ephemeral=True)
-        else:
-            await interaction.response.send_message("⚠️ هذا اللقب غير مفعل أساساً!", ephemeral=True)
-
-    @discord.ui.button(label="🔙 رجوع", style=discord.ButtonStyle.secondary, row=2)
-    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="أهلاً بك في حقيبتك الخاصة ✨\nمن هنا يمكنك إدارة ممتلكاتك:", view=InventoryMainMenuView())
-
-
-# ==========================================
-# 🏷️ قائمة وإدارة الرتب (Discord Roles)
-# ==========================================
-class RanksSelect(discord.ui.Select):
-    def __init__(self, ranks, user_role_names):
-        options = []
-        for r in ranks:
-            is_active = r in user_role_names
-            options.append(discord.SelectOption(label=r, description="مفعلة في السيرفر ✨" if is_active else "موجودة في حقيبتك", emoji="🏷️"))
-        if not options:
-            options.append(discord.SelectOption(label="لا توجد رتب في حقيبتك", value="none"))
-        super().__init__(placeholder="اختر رتبة...", min_values=1, max_values=1, options=options)
-
-    async def callback(self, interaction: discord.Interaction):
-        self.view.selected_rank = self.values[0]
-        await interaction.response.defer()
-
-class RanksView(discord.ui.View):
-    def __init__(self, user_data, user, ranks):
-        super().__init__(timeout=180)
-        self.user_data = user_data
-        self.user = user
-        self.selected_rank = None
-        user_role_names = [r.name for r in user.roles] if isinstance(user, discord.Member) else []
-        self.add_item(RanksSelect(ranks, user_role_names))
-
-    @discord.ui.button(label="✅ تفعيل الرتبة", style=discord.ButtonStyle.success, row=1)
-    async def activate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_rank or self.selected_rank == "none":
-            return await interaction.response.send_message("❌ الرجاء اختيار رتبة من القائمة أولاً!", ephemeral=True)
+        user_data = get_user_inventory(self.user_id)
+        # تصفير الحقيبة أو اختيار عنصر للإزالة (تم جعلها لتصفير الرتب أو صناديق حسب الرغبة، أو إعطاء خيارات)
+        user_data["boxes"] = {"الشائع": 0, "غير الشائع": 0, "النادر": 0, "الإيبك": 0, "الميثك": 0}
+        user_data["ranks"] = []
+        update_user_inventory(self.user_id, user_data)
         
-        if isinstance(interaction.user, discord.Member):
-            role = discord.utils.get(interaction.user.guild.roles, name=self.selected_rank)
-            if role:
-                if role not in interaction.user.roles:
-                    try:
-                        await interaction.user.add_roles(role)
-                    except Exception as e:
-                        return await interaction.response.send_message(f"❌ خطأ أثناء تفعيل الرتبة: {e}", ephemeral=True)
-                
-                await interaction.response.send_message(f"✅ تم تفعيل الرتبة في السيرفر: **{self.selected_rank}** بنجاح!", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"❌ الرتبة **{self.selected_rank}** غير موجودة في رتب السيرفر حالياً!", ephemeral=True)
-
-    @discord.ui.button(label="❌ إزالة الرتبة من السيرفر", style=discord.ButtonStyle.danger, row=1)
-    async def deactivate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_rank or self.selected_rank == "none":
-            return await interaction.response.send_message("❌ الرجاء اختيار رتبة من القائمة أولاً!", ephemeral=True)
-        
-        if isinstance(interaction.user, discord.Member):
-            role = discord.utils.get(interaction.user.guild.roles, name=self.selected_rank)
-            if role:
-                if role in interaction.user.roles:
-                    try:
-                        await interaction.user.remove_roles(role)
-                    except Exception as e:
-                        return await interaction.response.send_message(f"❌ خطأ أثناء إزالة الرتبة: {e}", ephemeral=True)
-
-                # تنبيه: الرتبة تبقى محفوظة في الحقيبة ولا تُحذف نهائياً
-                await interaction.response.send_message(f"❌ تم إزالة الرتبة من حسابك: **{self.selected_rank}** (لا تزال محفوظة في حقيبتك ولم تُحذف، يمكنك تفعيلها مجدداً في أي وقت).", ephemeral=True)
-            else:
-                await interaction.response.send_message(f"⚠️ الرتبة غير موجودة في السيرفر!", ephemeral=True)
-
-    @discord.ui.button(label="🔙 رجوع", style=discord.ButtonStyle.secondary, row=2)
-    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="أهلاً بك في حقيبتك الخاصة ✨\nمن هنا يمكنك إدارة ممتلكاتك:", view=InventoryMainMenuView())
+        await interaction.response.send_message("🗑️ تم تنظيف حقيبتك وإزالة جميع الصناديق والرتب غير المفعلة بنجاح!", ephemeral=True)
 
 
-# ==========================================
-# 🎁 قائمة وعرض الصناديق
-# ==========================================
-class BoxButton(discord.ui.Button):
-    def __init__(self, box_name, count):
-        super().__init__(label=f"{box_name} ({count})", style=discord.ButtonStyle.secondary, emoji="📦")
-        self.box_name = box_name
-
-    async def callback(self, interaction: discord.Interaction):
-        view = self.view
-        view.selected_box = self.box_name
-        
-        boxes = view.user_data.get("boxes", {})
-        desc = "🎁 **صناديقك:**\n\n"
-        for b_name, b_count in boxes.items():
-            desc += f"📦 {b_name} ×{b_count}\n"
-        desc += f"\n🎁 تم اختيار صندوق **({self.box_name})**"
-
-        open_view = BoxSelectedView(view.user_data, view.user, self.box_name)
-        await interaction.response.edit_message(content=desc, view=open_view)
-
-class BoxesView(discord.ui.View):
-    def __init__(self, user_data, user):
-        super().__init__(timeout=180)
-        self.user_data = user_data
-        self.user = user
-        self.selected_box = None
-
-        boxes = user_data.get("boxes", {})
-        for box_name, count in boxes.items():
-            self.add_item(BoxButton(box_name, count))
-
-    @discord.ui.button(label="🔙 رجوع", style=discord.ButtonStyle.secondary, row=2)
-    async def back(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content="أهلاً بك في حقيبتك الخاصة ✨\nمن هنا يمكنك إدارة ممتلكاتك:", view=InventoryMainMenuView())
-
-class BoxSelectedView(discord.ui.View):
-    def __init__(self, user_data, user, box_name):
-        super().__init__(timeout=180)
-        self.user_data = user_data
-        self.user = user
-        self.box_name = box_name
-
-    @discord.ui.button(label="🔥 فتح الصندوق", style=discord.ButtonStyle.primary, row=1)
-    async def open_box(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(f"✨ تم النقر لفتح صندوق **({self.box_name})** (سيتم ربط محتوى فتح الصناديق لاحقاً)", ephemeral=True)
-
-    @discord.ui.button(label="🔙 رجوع للصناديق", style=discord.ButtonStyle.secondary, row=1)
-    async def back_to_boxes(self, interaction: discord.Interaction, button: discord.ui.Button):
-        boxes = self.user_data.get("boxes", {})
-        desc = "🎁 **صناديقك:**\n\n"
-        for b_name, b_count in boxes.items():
-            desc += f"📦 {b_name} ×{b_count}\n"
-        await interaction.response.edit_message(content=desc, view=BoxesView(self.user_data, self.user))
-
-
-# ==========================================
-# ⚙️ الـ Cog الخاص بالنظام وأمر الإدارة
-# ==========================================
 class InventoryCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="setup_inventory", description="إرسال لوحة نظام الحقيبة في الروم الحالي (للإدارة فقط)")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def setup_inventory(self, interaction: discord.Interaction):
+    @app_commands.command(name="inventory", description="فتح حقيبتك الشخصية")
+    async def inventory_cmd(self, interaction: discord.Interaction):
+        user_data = get_user_inventory(interaction.user.id)
+        
         embed = discord.Embed(
             title="🎒 نظام الحقيبة",
-            description="أهلاً بك في حقيبتك الخاصة ✨\n\nمن هنا يمكنك إدارة ممتلكاتك:\n\n🪪 ألقابك النصية\n🏷️ رتبك\n🎁 صناديقي",
-            color=discord.Color.blurple()
+            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\n💰 الكوينز: **{user_data.get('coins', 0):,}**\n⭐ الـ XP: **{user_data.get('xp', 0):,}**",
+            color=discord.Color.blue()
         )
-        view = InventorySetupView()
-        await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ تمت إرسال لوحة الانفنتوري بنجاح في هذا الروم.", ephemeral=True)
-
-    @setup_inventory.error
-    async def setup_inventory_error(self, interaction: discord.Interaction, error):
-        if isinstance(error, app_commands.errors.MissingPermissions):
-            await interaction.response.send_message("❌ عذراً، هذا الأمر مخصص للإدارة فقط!", ephemeral=True)
-        else:
-            await interaction.response.send_message(f"❌ حدث خطأ: {error}", ephemeral=True)
-
+        view = InventoryMainView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def setup(bot):
-    bot.add_view(InventorySetupView())
     await bot.add_cog(InventoryCog(bot))
