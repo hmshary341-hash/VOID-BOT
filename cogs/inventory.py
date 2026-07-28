@@ -26,7 +26,7 @@ def save_data(data):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def get_user_data(user_id):
-    """جلب بيانات العضو أو إنشاء بيانات افتراضية إن لمש تكن موجودة"""
+    """جلب بيانات العضو أو إنشاء بيانات افتراضية إن لم تكن موجودة"""
     data = load_data()
     uid = str(user_id)
     if uid not in data:
@@ -108,7 +108,8 @@ class InventoryMainMenuView(discord.ui.View):
         desc = "🏷️ **رتبك:**\n\n"
         if all_ranks:
             for r in all_ranks:
-                status = " (مفعلة ✨)" if (r in active_ranks or r in discord_roles) else ""
+                is_active = (r in active_ranks) or (r in discord_roles)
+                status = " (مفعلة ✨)" if is_active else ""
                 desc += f"• {r}{status}\n"
         else:
             desc += "لا توجد رتب حالياً.\n"
@@ -207,7 +208,7 @@ class RanksView(discord.ui.View):
 
     @discord.ui.button(label="✅ تفعيل الرتبة", style=discord.ButtonStyle.success, row=1)
     async def activate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_rank:
+        if not self.selected_rank or self.selected_rank == "none":
             return await interaction.response.send_message("❌ الرجاء اختيار رتبة من القائمة أولاً!", ephemeral=True)
         
         active_ranks = self.user_data.get("active_ranks", [])
@@ -215,25 +216,47 @@ class RanksView(discord.ui.View):
             active_ranks.append(self.selected_rank)
             self.user_data["active_ranks"] = active_ranks
             
-            # التأكد من حفظها في قائمة الرتب أيضاً
             if self.selected_rank not in self.user_data.get("ranks", []):
                 self.user_data["ranks"].append(self.selected_rank)
                 
             update_user_data(self.user.id, self.user_data)
+            
+            # إضافة الرتبة فعلياً في السيرفر للعضو
+            if isinstance(interaction.user, discord.Member):
+                role = discord.utils.get(interaction.user.guild.roles, name=self.selected_rank)
+                if role:
+                    try:
+                        await interaction.user.add_roles(role)
+                    except Exception as e:
+                        print(f"Error adding role: {e}")
+
             await interaction.response.send_message(f"✅ تم تفعيل الرتبة: **{self.selected_rank}** بنجاح!", ephemeral=True)
         else:
             await interaction.response.send_message("⚠️ هذه الرتبة مفعلة مسبقاً!", ephemeral=True)
 
     @discord.ui.button(label="❌ إزالة الرتبة", style=discord.ButtonStyle.danger, row=1)
     async def deactivate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not self.selected_rank:
+        if not self.selected_rank or self.selected_rank == "none":
             return await interaction.response.send_message("❌ الرجاء اختيار رتبة من القائمة أولاً!", ephemeral=True)
         
         active_ranks = self.user_data.get("active_ranks", [])
-        if self.selected_rank in active_ranks:
-            active_ranks.remove(self.selected_rank)
-            self.user_data["active_ranks"] = active_ranks
-            update_user_data(self.user.id, self.user_data)
+        discord_role_names = [r.name for r in interaction.user.roles] if isinstance(interaction.user, discord.Member) else []
+        
+        if self.selected_rank in active_ranks or self.selected_rank in discord_role_names:
+            if self.selected_rank in active_ranks:
+                active_ranks.remove(self.selected_rank)
+                self.user_data["active_ranks"] = active_ranks
+                update_user_data(self.user.id, self.user_data)
+            
+            # إزالة الرتبة فعلياً من رتب العضو في ديسكورد
+            if isinstance(interaction.user, discord.Member):
+                role = discord.utils.get(interaction.user.guild.roles, name=self.selected_rank)
+                if role:
+                    try:
+                        await interaction.user.remove_roles(role)
+                    except Exception as e:
+                        print(f"Error removing role: {e}")
+
             await interaction.response.send_message(f"❌ تم إزالة الرتبة: **{self.selected_rank}** (محفوظة ويمكن إرجاعها).", ephemeral=True)
         else:
             await interaction.response.send_message("⚠️ هذه الرتبة غير مفعلة أساساً!", ephemeral=True)
@@ -327,6 +350,5 @@ class InventoryCog(commands.Cog):
 
 
 async def setup(bot):
-    # تسجيل الـ Persistent View لاستمرار العمل بعد إعادة تشغيل البوت
     bot.add_view(InventorySetupView())
     await bot.add_cog(InventoryCog(bot))
