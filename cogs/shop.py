@@ -6,6 +6,7 @@ import os
 import asyncio
 import sqlite3
 from datetime import date
+import random
 
 # --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات ---
 DATA_DIR = "/app/data"
@@ -13,7 +14,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "economy.json")
 DB_PATH = os.path.join(DATA_DIR, "streaks.db")
 
-INVENTORY_CHANNEL_ID = 1530408124958244975  # روم مقتنياتك
+INVENTORY_CHANNEL_ID = 1531553668145479821  # آيدي روم مقتنياتك المحدث
 
 # --- أسعار وأتمتة المنتجات ---
 ROLES_SHOP = {
@@ -60,6 +61,18 @@ def get_user_coins(user_id):
     if isinstance(user_data, int):
         return user_data
     return user_data.get("coins", 0)
+
+def add_user_coins(user_id, amount):
+    data = load_data()
+    user_id = str(user_id)
+    if user_id not in data:
+        data[user_id] = {"coins": amount}
+    else:
+        if isinstance(data[user_id], int):
+            data[user_id] = {"coins": data[user_id] + amount}
+        else:
+            data[user_id]["coins"] = data[user_id].get("coins", 0) + amount
+    save_data(data)
 
 def deduct_user_coins(user_id, amount):
     data = load_data()
@@ -133,14 +146,13 @@ class PurchaseSelect(discord.ui.Select):
         price = item["price"]
 
         if user_coins < price:
-            await interaction.response.send_message(f"❌ ليس لديك رصيد كافٍ! رصيدك: **{user_coins:,} كوينز**.", ephemeral=True)
+            await interaction.response.send_message(f"❌ ليس لديك رصيد كافٍ في حسابك البنكي! رصيدك: **{user_coins:,} كوينز**.", ephemeral=True)
             return
 
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         today = str(date.today())
         
-        # إذا كان شراء درع، يذهب مباشرة للستريك وليس الحقيبة
         if self.shop_type == "needs" and item_key == "shield":
             cursor.execute("SELECT shield_bought_today, last_shield_date FROM streaks WHERE user_id = ? AND guild_id = ?", (interaction.user.id, interaction.guild.id))
             res = cursor.fetchone()
@@ -158,10 +170,10 @@ class PurchaseSelect(discord.ui.Select):
             conn.commit()
             conn.close()
             deduct_user_coins(interaction.user.id, price)
-            await interaction.response.send_message("🛡️ تم شراء الدرع وإضافته إلى الستريك الخاص بك بنجاح!", ephemeral=True)
+            await interaction.response.send_message("🛡️ تم شراء الدرع وإضافته إلى الستريك الخاص بك بنجاح (تم الخصم من حسابك البنكي)!", ephemeral=True)
             return
 
-        # خصم الكوينز وإرسال الصناديق أو المنتجات العادية للحقيبة
+        # خصم المبلغ من الحساب البنكي
         deduct_user_coins(interaction.user.id, price)
 
         cursor.execute("SELECT quantity FROM user_inventory WHERE user_id = ? AND guild_id = ? AND item_key = ?", (interaction.user.id, interaction.guild.id, item_key))
@@ -175,14 +187,14 @@ class PurchaseSelect(discord.ui.Select):
         conn.commit()
         conn.close()
 
-        await interaction.response.send_message(f"يلا روح طلبك وصل في روم <#{INVENTORY_CHANNEL_ID}>", ephemeral=False)
+        await interaction.response.send_message(f"✅ تم الشراء بنجاح! طلبك وصل في روم المقتنيات <#{INVENTORY_CHANNEL_ID}> (تم الخصم من حسابك البنكي)", ephemeral=True)
 
 class PurchaseView(discord.ui.View):
     def __init__(self, shop_type: str):
         super().__init__(timeout=None)
         self.add_item(PurchaseSelect(shop_type))
 
-    @discord.ui.button(label="قفل المتجر", style=discord.ButtonStyle.danger, custom_id="close_store_button")
+    @discord.ui.button(label="قفل المتجر", style=discord.ButtonStyle.danger, custom_id="close_store_button_unique")
     async def close_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("🔒 جاري قفل المتجر...", ephemeral=True)
         await asyncio.sleep(2)
@@ -195,15 +207,15 @@ class StoreView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="افتح متجر الرتب", style=discord.ButtonStyle.primary, custom_id="roles_store")
+    @discord.ui.button(label="افتح متجر الرتب", style=discord.ButtonStyle.primary, custom_id="roles_store_btn")
     async def roles_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_store_ticket(interaction, "متجر-الرتب", "roles")
 
-    @discord.ui.button(label="افتح متجر الألقاب", style=discord.ButtonStyle.success, custom_id="titles_store")
+    @discord.ui.button(label="افتح متجر الألقاب", style=discord.ButtonStyle.success, custom_id="titles_store_btn")
     async def titles_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_store_ticket(interaction, "متجر-الألقاب", "titles")
 
-    @discord.ui.button(label="إحتياجات الأعضاء", style=discord.ButtonStyle.secondary, custom_id="needs_store")
+    @discord.ui.button(label="إحتياجات الأعضاء", style=discord.ButtonStyle.secondary, custom_id="needs_store_btn")
     async def needs_store_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.create_store_ticket(interaction, "إحتياجات-الأعضاء", "needs")
 
@@ -238,28 +250,28 @@ class StoreView(discord.ui.View):
         await channel.send(desc, view=PurchaseView(shop_type))
 
 
-# --- نظام لوحة الحقيبة الدائمة (بدون وقت انتهاء) ---
+# --- نظام لوحة الحقيبة الدائمة ---
 class InventoryPanelView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="فتح الحقيبة", style=discord.ButtonStyle.green, custom_id="persistent_open_inventory")
+    @discord.ui.button(label="فتح الحقيبة", style=discord.ButtonStyle.green, custom_id="persistent_open_inventory_btn")
     async def open_inventory(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("📦 اختر القسم الذي تريد عرضه من حقيبتك:", view=InventoryCategoriesView(), ephemeral=True)
 
 class InventoryCategoriesView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=180)
 
-    @discord.ui.button(label="الألقاب", style=discord.ButtonStyle.primary, custom_id="inv_cat_titles")
+    @discord.ui.button(label="الألقاب", style=discord.ButtonStyle.primary, custom_id="inv_cat_titles_btn")
     async def titles_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.send_item_selector(interaction, "titles")
 
-    @discord.ui.button(label="الرتب", style=discord.ButtonStyle.primary, custom_id="inv_cat_roles")
+    @discord.ui.button(label="الرتب", style=discord.ButtonStyle.primary, custom_id="inv_cat_roles_btn")
     async def roles_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.send_item_selector(interaction, "roles")
 
-    @discord.ui.button(label="مقتنياتك", style=discord.ButtonStyle.secondary, custom_id="inv_cat_belongings")
+    @discord.ui.button(label="مقتنياتك", style=discord.ButtonStyle.secondary, custom_id="inv_cat_belongings_btn")
     async def belongings_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.send_belongings_selector(interaction)
 
@@ -274,7 +286,7 @@ class InventoryCategoriesView(discord.ui.View):
             await interaction.response.send_message(f"❌ ليس لديك أي {item_type} في حقيبتك.", ephemeral=True)
             return
 
-        view = discord.ui.View(timeout=None)
+        view = discord.ui.View(timeout=180)
         select = discord.ui.Select(placeholder=f"اختر {item_type}...", min_values=1, max_values=1)
         for key, name, qty in items:
             select.add_option(label=name, description=f"الكمية: {qty}", value=key)
@@ -290,7 +302,6 @@ class InventoryCategoriesView(discord.ui.View):
     async def send_belongings_selector(self, interaction: discord.Interaction):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        # استبعاد الدرع لأنه مخصص للستريك فقط
         cursor.execute("SELECT item_key, item_name, quantity FROM user_inventory WHERE user_id = ? AND guild_id = ? AND item_type = 'needs' AND item_key != 'shield'", (interaction.user.id, interaction.guild.id))
         items = cursor.fetchall()
         conn.close()
@@ -299,7 +310,7 @@ class InventoryCategoriesView(discord.ui.View):
             await interaction.response.send_message("❌ ليس لديك أي مقتنيات أو صناديق في حقيبتك.", ephemeral=True)
             return
 
-        view = discord.ui.View(timeout=None)
+        view = discord.ui.View(timeout=180)
         select = discord.ui.Select(placeholder="اختر مقتنى أو صندوق...", min_values=1, max_values=1)
         for key, name, qty in items:
             select.add_option(label=name, description=f"الكمية: {qty}", value=key)
@@ -307,7 +318,7 @@ class InventoryCategoriesView(discord.ui.View):
         async def select_callback(inter: discord.Interaction):
             selected_key = select.values[0]
             if "box" in selected_key:
-                await inter.response.send_message("🎁 صندوق محظوظ:", view=BoxActionView(selected_key), ephemeral=True)
+                await inter.response.send_message("🎁 فتح الصندوق:", view=BoxActionView(selected_key), ephemeral=True)
             else:
                 await inter.response.send_message("هذا عنصر عادي.", ephemeral=True)
 
@@ -315,14 +326,14 @@ class InventoryCategoriesView(discord.ui.View):
         view.add_item(select)
         await interaction.response.send_message("اختر من مقتنياتك:", view=view, ephemeral=True)
 
-# --- أزرار استخدام أو إزالة الرتبة واللقب (بدون حذف من الحقيبة) ---
+# --- أزرار استخدام أو إزالة الرتبة واللقب ---
 class RoleTitleActionView(discord.ui.View):
     def __init__(self, item_key: str, item_type: str):
-        super().__init__(timeout=None)
+        super().__init__(timeout=180)
         self.item_key = item_key
         self.item_type = item_type
 
-    @discord.ui.button(label="استخدام", style=discord.ButtonStyle.green, custom_id="action_use_item")
+    @discord.ui.button(label="استخدام", style=discord.ButtonStyle.green, custom_id="action_use_item_btn")
     async def use_item(self, interaction: discord.Interaction, button: discord.ui.Button):
         role_id = ROLES_SHOP.get(self.item_key, {}).get("role_id") or TITLES_SHOP.get(self.item_key, {}).get("role_id")
         if role_id:
@@ -336,7 +347,7 @@ class RoleTitleActionView(discord.ui.View):
                     pass
         await interaction.response.send_message("❌ حدث خطأ أثناء منح الرتبة (تأكد من صلاحيات البوت والـ Role ID).", ephemeral=True)
 
-    @discord.ui.button(label="إزالة", style=discord.ButtonStyle.danger, custom_id="action_remove_item")
+    @discord.ui.button(label="إزالة", style=discord.ButtonStyle.danger, custom_id="action_remove_item_btn")
     async def remove_item(self, interaction: discord.Interaction, button: discord.ui.Button):
         role_id = ROLES_SHOP.get(self.item_key, {}).get("role_id") or TITLES_SHOP.get(self.item_key, {}).get("role_id")
         if role_id:
@@ -350,13 +361,13 @@ class RoleTitleActionView(discord.ui.View):
                     pass
         await interaction.response.send_message("❌ حدث خطأ أو لم تكن تمتلك الرتبة فعلياً.", ephemeral=True)
 
-# --- زر فتح الصندوق ---
+# --- زر فتح الصندوق وإضافة الجائزة لحساب البنك ---
 class BoxActionView(discord.ui.View):
     def __init__(self, box_key: str):
-        super().__init__(timeout=None)
+        super().__init__(timeout=180)
         self.box_key = box_key
 
-    @discord.ui.button(label="فتح الصندوق", style=discord.ButtonStyle.blurple, custom_id="action_open_box")
+    @discord.ui.button(label="فتح الصندوق", style=discord.ButtonStyle.blurple, custom_id="action_open_box_btn")
     async def open_box(self, interaction: discord.Interaction, button: discord.ui.Button):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -376,8 +387,27 @@ class BoxActionView(discord.ui.View):
         conn.commit()
         conn.close()
 
-        # يمكنك تعديل الجائزة هنا حسب رغبتك
-        await interaction.response.send_message("🎉 مبروك! فتحت الصندوق وحصلت على جوائز مميزة (تم خصم الصندوق من حقيبتك).", ephemeral=True)
+        # تحديد جوائز الكوينز حسب نوع الصندوق
+        rewards = {
+            "common_box": (1000, 5000),
+            "uncommon_box": (5000, 15000),
+            "rare_box": (15000, 40000),
+            "epic_box": (40000, 100000),
+            "mythic_box": (100000, 300000)
+        }
+
+        min_val, max_val = rewards.get(self.box_key, (500, 2000))
+        won_coins = random.randint(min_val, max_val)
+        
+        # إضافة الكوينز مباشرة إلى رصيد حساب المستخدم البنكي
+        add_user_coins(interaction.user.id, won_coins)
+
+        await interaction.response.send_message(
+            f"🎉 **مبروك! فتحت الصندوق بنجاح:**\n"
+            f"🎁 الجائزة: **{won_coins:,} كوينز**\n"
+            f"💳 (تم إيداع الكوينز مباشرة في حسابك البنكي وتم خصم الصندوق من حقيبتك).", 
+            ephemeral=True
+        )
 
 
 # --- الكوج الرئيسي ---
