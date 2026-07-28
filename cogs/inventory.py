@@ -86,8 +86,7 @@ def add_title_to_inventory(user_id, title_name):
         user_data["titles"].append(title_name)
         update_user_inventory(user_id, user_data)
 
-
-# --- دوال فتح الصناديق ---
+# --- منطق فتح الصناديق ---
 async def open_chest_logic(interaction: discord.Interaction, chest_name: str):
     user_id = interaction.user.id
     user_data = get_user_inventory(user_id)
@@ -139,8 +138,7 @@ async def open_chest_logic(interaction: discord.Interaction, chest_name: str):
     )
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-
-# --- واجهات الانفنتوري والأزرار ---
+# --- القوائم والأزرار بالشكل الأصلي الأول مع زر الإزالة المخصص ---
 class ChestSelect(discord.ui.Select):
     def __init__(self, user_boxes):
         options = []
@@ -148,7 +146,7 @@ class ChestSelect(discord.ui.Select):
             options.append(
                 discord.SelectOption(
                     label=f"صندوق {chest_name}",
-                    description=f"المتوفر في حقيبتك: {count}",
+                    description=f"المتوفر: {count}",
                     value=chest_name,
                     emoji="📦"
                 )
@@ -164,75 +162,81 @@ class ChestsOpenView(discord.ui.View):
         super().__init__(timeout=180)
         self.add_item(ChestSelect(user_boxes))
 
+    @discord.ui.button(label="رجوع للصناديق", style=discord.ButtonStyle.secondary, custom_id="back_to_boxes")
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_data = get_user_inventory(interaction.user.id)
+        user_boxes = user_data.get("boxes", {})
+        box_text = "\n".join([f"📦 **{name}**: {count}x" for name, count in user_boxes.items()])
+        await interaction.response.edit_message(content=f"🎁 **صناديقك:**\n\n{box_text}", view=self)
 
-class InventoryMainView(discord.ui.View):
+class InventoryOptionsView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=180)
         self.user_id = user_id
 
-    @discord.ui.button(label="📦 صناديقي", style=discord.ButtonStyle.primary, custom_id="inv_boxes")
-    async def boxes_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="ألقابك النصية", style=discord.ButtonStyle.secondary, custom_id="inv_titles_btn", emoji="🪪")
+    async def titles_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
             return
-        
         user_data = get_user_inventory(self.user_id)
-        user_boxes = user_data.get("boxes", {})
-        
-        total_boxes = sum(user_boxes.values())
-        if total_boxes <= 0:
-            await interaction.response.send_message("❌ حقيبتك خالية تماماً من الصناديق!", ephemeral=True)
+        titles = user_data.get("titles", [])
+        if not titles:
+            await interaction.response.send_message("❌ لا تمتلك أي ألقاب في حقيبتك!", ephemeral=True)
             return
+        titles_text = "\n".join([f"• {t}" for t in titles])
+        await interaction.response.send_message(f"🪪 **ألقابك النصية:**\n{titles_text}", ephemeral=True)
 
-        view = ChestsOpenView(user_boxes)
-        box_text = "\n".join([f"📦 **{name}**: {count}x" for name, count in user_boxes.items()])
-        await interaction.response.send_message(f"🎁 **صنايقك:**\n{box_text}\n\nاختر الصندوق الذي تود فتحه:", view=view, ephemeral=True)
-
-    @discord.ui.button(label="🏷️ رتبك", style=discord.ButtonStyle.secondary, custom_id="inv_ranks")
-    async def ranks_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="رتبك", style=discord.ButtonStyle.secondary, custom_id="inv_ranks_btn", emoji="🏷️")
+    async def ranks_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
             return
-        
         user_data = get_user_inventory(self.user_id)
         ranks = user_data.get("ranks", [])
         if not ranks:
             await interaction.response.send_message("❌ لا تمتلك أي رتب في حقيبتك!", ephemeral=True)
             return
-        
         ranks_text = "\n".join([f"• {r}" for r in ranks])
         await interaction.response.send_message(f"🏷️ **رتبك في الحقيبة:**\n{ranks_text}", ephemeral=True)
 
-    @discord.ui.button(label="🗑️ إزالة العناصر", style=discord.ButtonStyle.danger, custom_id="inv_remove")
-    async def remove_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+    @discord.ui.button(label="صناديقي", style=discord.ButtonStyle.primary, custom_id="inv_boxes_btn", emoji="🎁")
+    async def boxes_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
             return
-        
         user_data = get_user_inventory(self.user_id)
-        user_data["boxes"] = {"الشائع": 0, "غير الشائع": 0, "النادر": 0, "الإيبك": 0, "الميثك": 0}
-        user_data["ranks"] = []
-        update_user_inventory(self.user_id, user_data)
+        user_boxes = user_data.get("boxes", {})
         
-        await interaction.response.send_message("🗑️ تم تنظيف حقيبتك وإزالة جميع الصناديق والرتب غير المفعلة بنجاح!", ephemeral=True)
+        box_text = "\n".join([f"📦 **{name}** ×{count}" for name, count in user_boxes.items()])
+        view = ChestsOpenView(user_boxes)
+        await interaction.response.send_message(f"🎁 **صناديقك:**\n\n{box_text}", view=view, ephemeral=True)
 
+    @discord.ui.button(label="إزالة الرتب والألقاب", style=discord.ButtonStyle.danger, custom_id="inv_remove_ranks_titles", emoji="🗑️")
+    async def remove_ranks_titles_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
+            return
+        user_data = get_user_inventory(self.user_id)
+        user_data["ranks"] = []
+        user_data["titles"] = []
+        update_user_inventory(self.user_id, user_data)
+        await interaction.response.send_message("🗑️ تم إزالة جميع الرتب والألقاب من حقيبتك بنجاح **مع الاحتفاظ بالصناديق تماماً**!", ephemeral=True)
 
-# الكلاس المطلوب لكي ينجح الاستيراد في main.py
 class InventorySetupView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @discord.ui.button(label="🎒 فتح الحقيبة", style=discord.ButtonStyle.primary, custom_id="persistent_inventory_button")
+    @discord.ui.button(label="📂 فتح الانفنتوري", style=discord.ButtonStyle.primary, custom_id="persistent_inventory_button")
     async def open_inventory_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_data = get_user_inventory(interaction.user.id)
         embed = discord.Embed(
             title="🎒 نظام الحقيبة",
-            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\n💰 الكوينز: **{user_data.get('coins', 0):,}**\n⭐ الـ XP: **{user_data.get('xp', 0):,}**",
+            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\nمن هنا يمكنك إدارة ممتلكاتك:\n\n🪪 ألقابك النصية\n🏷️ رتبك\n🎁 صناديقي",
             color=discord.Color.blue()
         )
-        view = InventoryMainView(interaction.user.id)
+        view = InventoryOptionsView(interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
 
 class InventoryCog(commands.Cog):
     def __init__(self, bot):
@@ -241,13 +245,12 @@ class InventoryCog(commands.Cog):
     @app_commands.command(name="inventory", description="فتح حقيبتك الشخصية")
     async def inventory_cmd(self, interaction: discord.Interaction):
         user_data = get_user_inventory(interaction.user.id)
-        
         embed = discord.Embed(
             title="🎒 نظام الحقيبة",
-            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\n💰 الكوينز: **{user_data.get('coins', 0):,}**\n⭐ الـ XP: **{user_data.get('xp', 0):,}**",
+            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\nمن هنا يمكنك إدارة ممتلكاتك:\n\n🪪 ألقابك النصية\n🏷️ رتبك\n🎁 صناديقي",
             color=discord.Color.blue()
         )
-        view = InventoryMainView(interaction.user.id)
+        view = InventoryOptionsView(interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 async def setup(bot):
