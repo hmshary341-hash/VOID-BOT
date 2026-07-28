@@ -7,7 +7,7 @@ import os
 DATA_FILE = "inventory.json"
 
 # ==========================================
-# 📂 دوال التحميل والحفظ (JSON Functions)
+# 📂 دوال التحميل والحفظ والربط مع المتجر (JSON Functions)
 # ==========================================
 def load_data():
     """تحميل البيانات من ملف inventory.json"""
@@ -31,11 +31,10 @@ def get_user_data(user_id):
     uid = str(user_id)
     if uid not in data:
         data[uid] = {
-            "titles": [],          # تبدأ فارغة ليتم إضافتها من النظام/الإدارة
-            "active_title": None,
-            "ranks": [],           # الرتب المكتسبة من النظام
-            "active_ranks": [],
-            "boxes": {             # تبدأ جميعها بـ 0 لتأتي من المتجر لاحقاً
+            "titles": [],          # الألقاب النصية المملوكة
+            "active_title": None,  # اللقب النصي المفعل حالياً
+            "ranks": [],           # الرتب المملوكة في الحقيبة
+            "boxes": {             # الصناديق المملوكة
                 "الشائع": 0,
                 "غير الشائع": 0,
                 "النادر": 0,
@@ -51,6 +50,30 @@ def update_user_data(user_id, user_data):
     data = load_data()
     data[str(user_id)] = user_data
     save_data(data)
+
+# 🔗 دوال مساعدة لربط المتجر (Shop) بالحقيبة:
+def add_title_to_inventory(user_id, title_name):
+    """إضافة لقب نصي للعضو عند شرائه من متجر الألقاب"""
+    user_data = get_user_data(user_id)
+    if title_name not in user_data["titles"]:
+        user_data["titles"].append(title_name)
+        update_user_data(user_id, user_data)
+
+def add_rank_to_inventory(user_id, rank_name):
+    """إضافة رتبة للعضو عند شرائها من المتجر"""
+    user_data = get_user_data(user_id)
+    if rank_name not in user_data["ranks"]:
+        user_data["ranks"].append(rank_name)
+        update_user_data(user_id, user_data)
+
+def add_box_to_inventory(user_id, box_name, amount=1):
+    """إضافة صندوق للعضو عند شرائه من المتجر"""
+    user_data = get_user_data(user_id)
+    if box_name in user_data["boxes"]:
+        user_data["boxes"][box_name] += amount
+    else:
+        user_data["boxes"][box_name] = amount
+    update_user_data(user_id, user_data)
 
 
 # ==========================================
@@ -88,7 +111,7 @@ class InventoryMainMenuView(discord.ui.View):
                 status = " (مفعل ✨)" if t == active_title else ""
                 desc += f"• {t}{status}\n"
         else:
-            desc += "لا توجد ألقاب لديك حالياً.\n"
+            desc += "لا توجد ألقاب لديك حالياً (قم بشرائها من متجر الألقاب).\n"
 
         view = TitlesView(user_data, interaction.user)
         await interaction.response.edit_message(content=desc, view=view)
@@ -96,24 +119,19 @@ class InventoryMainMenuView(discord.ui.View):
     @discord.ui.button(label="🏷️ رتبي", style=discord.ButtonStyle.secondary, custom_id="menu:ranks_btn")
     async def ranks_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
         user_data = get_user_data(interaction.user.id)
-        
-        # قراءة رتب العضو الحالية من ديسكورد تلقائياً + الرتب من JSON
-        discord_roles = [role.name for role in interaction.user.roles if role.name != "@everyone"] if isinstance(interaction.user, discord.Member) else []
-        json_ranks = user_data.get("ranks", [])
-        
-        # دمج الرتب بدون تكرار
-        all_ranks = list(set(json_ranks + discord_roles))
+        ranks = user_data.get("ranks", [])
+        user_roles = [role.name for role in interaction.user.roles] if isinstance(interaction.user, discord.Member) else []
 
         desc = "🏷️ **رتبك:**\n\n"
-        if all_ranks:
-            for r in all_ranks:
-                is_active = r in discord_roles
-                status = " (مفعلة ✨)" if is_active else ""
+        if ranks:
+            for r in ranks:
+                is_active = r in user_roles
+                status = " (مفعلة في السيرفر ✨)" if is_active else " (في الحقيبة غير مفعلة)"
                 desc += f"• {r}{status}\n"
         else:
-            desc += "لا توجد رتب لديك حالياً.\n"
+            desc += "لا توجد رتب لديك في حقيبتك حالياً.\n"
 
-        view = RanksView(user_data, interaction.user, all_ranks)
+        view = RanksView(user_data, interaction.user, ranks)
         await interaction.response.edit_message(content=desc, view=view)
 
     @discord.ui.button(label="🎁 صناديقي", style=discord.ButtonStyle.secondary, custom_id="menu:boxes_btn")
@@ -130,14 +148,14 @@ class InventoryMainMenuView(discord.ui.View):
 
 
 # ==========================================
-# 🪪 قائمة وإدارة الألقاب (JSON فقط بدون رتب سيرفر)
+# 🪪 قائمة وإدارة الألقاب النصية
 # ==========================================
 class TitlesSelect(discord.ui.Select):
     def __init__(self, titles, active_title):
         options = []
         for t in titles:
             is_active = (t == active_title)
-            options.append(discord.SelectOption(label=t, description="مفعل حالياً ✨" if is_active else "لقب ملكك", emoji="🪪"))
+            options.append(discord.SelectOption(label=t, description="مفعل حالياً ✨" if is_active else "موجود في حقيبتك", emoji="🪪"))
         if not options:
             options.append(discord.SelectOption(label="لا توجد ألقاب", value="none"))
         super().__init__(placeholder="اختر لقباً...", min_values=1, max_values=1, options=options)
@@ -161,9 +179,9 @@ class TitlesView(discord.ui.View):
         
         self.user_data["active_title"] = self.selected_title
         update_user_data(self.user.id, self.user_data)
-        await interaction.response.send_message(f"✅ تم تفعيل اللقب: **{self.selected_title}** بنجاح!", ephemeral=True)
+        await interaction.response.send_message(f"✅ تم تفعيل اللقب النصي: **{self.selected_title}** بنجاح!", ephemeral=True)
 
-    @discord.ui.button(label="❌ إزالة اللقب", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="❌ إلغاء تفعيل اللقب", style=discord.ButtonStyle.danger, row=1)
     async def deactivate_title(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.selected_title or self.selected_title == "none":
             return await interaction.response.send_message("❌ الرجاء اختيار لقب من القائمة أولاً!", ephemeral=True)
@@ -171,7 +189,7 @@ class TitlesView(discord.ui.View):
         if self.user_data.get("active_title") == self.selected_title:
             self.user_data["active_title"] = None
             update_user_data(self.user.id, self.user_data)
-            await interaction.response.send_message(f"❌ تم إزالة تفعيل اللقب: **{self.selected_title}** (محفوظ في ملف البيانات).", ephemeral=True)
+            await interaction.response.send_message(f"❌ تم إيقاف تفعيل اللقب: **{self.selected_title}** (لا يزال محفوظاً في حقيبتك ولم يُحذف).", ephemeral=True)
         else:
             await interaction.response.send_message("⚠️ هذا اللقب غير مفعل أساساً!", ephemeral=True)
 
@@ -184,13 +202,13 @@ class TitlesView(discord.ui.View):
 # 🏷️ قائمة وإدارة الرتب (Discord Roles)
 # ==========================================
 class RanksSelect(discord.ui.Select):
-    def __init__(self, ranks, user_roles):
+    def __init__(self, ranks, user_role_names):
         options = []
         for r in ranks:
-            is_active = r in user_roles
-            options.append(discord.SelectOption(label=r, description="مفعلة حالياً ✨" if is_active else "رتبة ملكك", emoji="🏷️"))
+            is_active = r in user_role_names
+            options.append(discord.SelectOption(label=r, description="مفعلة في السيرفر ✨" if is_active else "موجودة في حقيبتك", emoji="🏷️"))
         if not options:
-            options.append(discord.SelectOption(label="لا توجد رتب", value="none"))
+            options.append(discord.SelectOption(label="لا توجد رتب في حقيبتك", value="none"))
         super().__init__(placeholder="اختر رتبة...", min_values=1, max_values=1, options=options)
 
     async def callback(self, interaction: discord.Interaction):
@@ -198,13 +216,13 @@ class RanksSelect(discord.ui.Select):
         await interaction.response.defer()
 
 class RanksView(discord.ui.View):
-    def __init__(self, user_data, user, all_ranks):
+    def __init__(self, user_data, user, ranks):
         super().__init__(timeout=180)
         self.user_data = user_data
         self.user = user
         self.selected_rank = None
-        user_roles = [r.name for r in user.roles] if isinstance(user, discord.Member) else []
-        self.add_item(RanksSelect(all_ranks, user_roles))
+        user_role_names = [r.name for r in user.roles] if isinstance(user, discord.Member) else []
+        self.add_item(RanksSelect(ranks, user_role_names))
 
     @discord.ui.button(label="✅ تفعيل الرتبة", style=discord.ButtonStyle.success, row=1)
     async def activate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -220,16 +238,11 @@ class RanksView(discord.ui.View):
                     except Exception as e:
                         return await interaction.response.send_message(f"❌ خطأ أثناء تفعيل الرتبة: {e}", ephemeral=True)
                 
-                # حفظ الرتبة في الـ JSON إن لم تكن موجودة
-                if self.selected_rank not in self.user_data.get("ranks", []):
-                    self.user_data["ranks"].append(self.selected_rank)
-                    update_user_data(self.user.id, self.user_data)
-
-                await interaction.response.send_message(f"✅ تم تفعيل الرتبة: **{self.selected_rank}** بنجاح!", ephemeral=True)
+                await interaction.response.send_message(f"✅ تم تفعيل الرتبة في السيرفر: **{self.selected_rank}** بنجاح!", ephemeral=True)
             else:
-                await interaction.response.send_message(f"❌ الرتبة **{self.selected_rank}** غير موجودة في رتب السيرفر!", ephemeral=True)
+                await interaction.response.send_message(f"❌ الرتبة **{self.selected_rank}** غير موجودة في رتب السيرفر حالياً!", ephemeral=True)
 
-    @discord.ui.button(label="❌ إزالة الرتبة", style=discord.ButtonStyle.danger, row=1)
+    @discord.ui.button(label="❌ إزالة الرتبة من السيرفر", style=discord.ButtonStyle.danger, row=1)
     async def deactivate_rank(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not self.selected_rank or self.selected_rank == "none":
             return await interaction.response.send_message("❌ الرجاء اختيار رتبة من القائمة أولاً!", ephemeral=True)
@@ -243,7 +256,8 @@ class RanksView(discord.ui.View):
                     except Exception as e:
                         return await interaction.response.send_message(f"❌ خطأ أثناء إزالة الرتبة: {e}", ephemeral=True)
 
-                await interaction.response.send_message(f"❌ تم إزالة الرتبة: **{self.selected_rank}** (محفوظة في بياناتك ويمكن إرجاعها).", ephemeral=True)
+                # تنبيه مهم: الرتبة تبقى محفوظة في حقيبته (self.user_data["ranks"]) ولا يتم حذفها نهائياً
+                await interaction.response.send_message(f"❌ تم إزالة الرتبة من حسابك: **{self.selected_rank}** (لا تزال محفوظة في حقيبتك ولم تُحذف، يمكنك تفعيلها مجدداً في أي وقت).", ephemeral=True)
             else:
                 await interaction.response.send_message(f"⚠️ الرتبة غير موجودة في السيرفر!", ephemeral=True)
 
@@ -297,7 +311,7 @@ class BoxSelectedView(discord.ui.View):
 
     @discord.ui.button(label="🔥 فتح الصندوق", style=discord.ButtonStyle.primary, row=1)
     async def open_box(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message(f"✨ تم النقر لفتح صندوق **({self.box_name})** (سيتم ربط نظام الصناديق لاحقاً)", ephemeral=True)
+        await interaction.response.send_message(f"✨ تم النقر لفتح صندوق **({self.box_name})** (سيتم ربط محتوى فتح الصناديق لاحقاً)", ephemeral=True)
 
     @discord.ui.button(label="🔙 رجوع للصناديق", style=discord.ButtonStyle.secondary, row=1)
     async def back_to_boxes(self, interaction: discord.Interaction, button: discord.ui.Button):
