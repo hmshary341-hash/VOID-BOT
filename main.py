@@ -4,7 +4,6 @@ import asyncio
 from discord.ext import commands
 from cogs.tickets import TicketActions, OpenTicketView
 from cogs.shop import StoreView  
-from cogs.inventory import InventorySetupView # استيراد واجهة الانفنتوري المستمرة
 
 # إعداد الصلاحيات (Intents) - استخدام all() يفعّل كل الصلاحيات بما فيها الصوت (voice_states)
 intents = discord.Intents.all()
@@ -18,7 +17,6 @@ async def on_ready():
     bot.add_view(TicketActions())
     bot.add_view(OpenTicketView())
     bot.add_view(StoreView())  
-    bot.add_view(InventorySetupView()) # تسجيل لوحة الانفنتوري كـ Persistent View
     
     # مزامنة الأوامر
     await bot.tree.sync()
