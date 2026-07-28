@@ -138,7 +138,7 @@ async def open_chest_logic(interaction: discord.Interaction, chest_name: str):
     )
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-# --- القوائم والأزرار بالشكل الأصلي الأول مع زر الإزالة المخصص ---
+# --- إدارة الصناديق ---
 class ChestSelect(discord.ui.Select):
     def __init__(self, user_boxes):
         options = []
@@ -169,6 +169,63 @@ class ChestsOpenView(discord.ui.View):
         box_text = "\n".join([f"📦 **{name}**: {count}x" for name, count in user_boxes.items()])
         await interaction.response.edit_message(content=f"🎁 **صناديقك:**\n\n{box_text}", view=self)
 
+# --- واجهة إدارة الرتب (تفعيل أو إلغاء تفعيل دون حذف من الحقيبة) ---
+class RanksManageView(discord.ui.View):
+    def __init__(self, user_id, ranks):
+        super().__init__(timeout=180)
+        self.user_id = user_id
+        options = [discord.SelectOption(label=r, value=r, emoji="🏷️") for r in ranks[:25]]
+        self.add_item(RanksSelect(options, user_id))
+
+    @discord.ui.button(label="إزالة / إلغاء تفعيل الرتبة الحالية", style=discord.ButtonStyle.danger, custom_id="unequip_rank", emoji="🛑")
+    async def unequip_rank_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
+            return
+        
+        user_data = get_user_inventory(self.user_id)
+        active_rank = user_data.get("active_rank")
+        
+        if not active_rank:
+            await interaction.response.send_message("❌ ليس لديك أي رتبة مفعلة حالياً!", ephemeral=True)
+            return
+
+        role = discord.utils.get(interaction.guild.roles, name=active_rank)
+        if role and role in interaction.user.roles:
+            try:
+                await interaction.user.remove_roles(role)
+            except Exception:
+                pass
+
+        user_data["active_rank"] = None
+        update_user_inventory(self.user_id, user_data)
+        await interaction.response.send_message(f"🛑 تم إزالة (إلغاء تفعيل) رتبة **{active_rank}** من عليك بنجاح! **ولا زالت محفوظة في حقيبتك**.", ephemeral=True)
+
+class RanksSelect(discord.ui.Select):
+    def __init__(self, options, user_id):
+        self.user_id = user_id
+        super().__init__(placeholder="اختر رتبة لتفعيلها على ديسكورد...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        selected_rank = self.values[0]
+        user_data = get_user_inventory(self.user_id)
+        
+        role = discord.utils.get(interaction.guild.roles, name=selected_rank)
+        if not role:
+            await interaction.response.send_message(f"❌ الرتبة **{selected_rank}** غير موجودة في رتب السيرفر حالياً!", ephemeral=True)
+            return
+        
+        try:
+            await interaction.user.add_roles(role)
+        except Exception:
+            await interaction.response.send_message("❌ حدث خطأ أثناء منحك الرتبة، تأكد من صلاحيات البوت.", ephemeral=True)
+            return
+
+        user_data["active_rank"] = selected_rank
+        update_user_inventory(self.user_id, user_data)
+        await interaction.response.send_message(f"✨ تم تفعيل رتبة **{selected_rank}** بنجاح! *(وهي محفوظة دائماً في حقيبتك)*", ephemeral=True)
+
+# --- واجهة الانفنتوري الرئيسية للأزرار ---
 class InventoryOptionsView(discord.ui.View):
     def __init__(self, user_id):
         super().__init__(timeout=180)
@@ -185,7 +242,7 @@ class InventoryOptionsView(discord.ui.View):
             await interaction.response.send_message("❌ لا تمتلك أي ألقاب في حقيبتك!", ephemeral=True)
             return
         titles_text = "\n".join([f"• {t}" for t in titles])
-        await interaction.response.send_message(f"🪪 **ألقابك النصية:**\n{titles_text}", ephemeral=True)
+        await interaction.response.send_message(f"🪪 **ألقابك النصية المحفوظة في الحقيبة:**\n{titles_text}", ephemeral=True)
 
     @discord.ui.button(label="رتبك", style=discord.ButtonStyle.secondary, custom_id="inv_ranks_btn", emoji="🏷️")
     async def ranks_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -197,8 +254,11 @@ class InventoryOptionsView(discord.ui.View):
         if not ranks:
             await interaction.response.send_message("❌ لا تمتلك أي رتب في حقيبتك!", ephemeral=True)
             return
+        
+        view = RanksManageView(self.user_id, ranks)
         ranks_text = "\n".join([f"• {r}" for r in ranks])
-        await interaction.response.send_message(f"🏷️ **رتبك في الحقيبة:**\n{ranks_text}", ephemeral=True)
+        active = user_data.get("active_rank", "لا يوجد")
+        await interaction.response.send_message(f"🏷️ **رتبك في الحقيبة:**\n{ranks_text}\n\n📌 الرتبة المفعلة حالياً: **{active}**\nاختر من القائمة لتفعيل الرتبة، أو اضغط زر الإزالة لإلغاء تفعيلها مع بقائها بالحقيبة:", view=view, ephemeral=True)
 
     @discord.ui.button(label="صناديقي", style=discord.ButtonStyle.primary, custom_id="inv_boxes_btn", emoji="🎁")
     async def boxes_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -212,20 +272,10 @@ class InventoryOptionsView(discord.ui.View):
         view = ChestsOpenView(user_boxes)
         await interaction.response.send_message(f"🎁 **صناديقك:**\n\n{box_text}", view=view, ephemeral=True)
 
-    @discord.ui.button(label="إزالة الرتب والألقاب", style=discord.ButtonStyle.danger, custom_id="inv_remove_ranks_titles", emoji="🗑️")
-    async def remove_ranks_titles_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ هذا ليس انفنتوري الخاص بك!", ephemeral=True)
-            return
-        user_data = get_user_inventory(self.user_id)
-        user_data["ranks"] = []
-        user_data["titles"] = []
-        update_user_inventory(self.user_id, user_data)
-        await interaction.response.send_message("🗑️ تم إزالة جميع الرتب والألقاب من حقيبتك بنجاح **مع الاحتفاظ بالصناديق تماماً**!", ephemeral=True)
-
+# --- اللوحة الدائمة التي لا تنتهي (لإرسالها عبر أمر الإدارة) ---
 class InventorySetupView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(timeout=None) # timeout=None لكي لا تنتهي أبداً
 
     @discord.ui.button(label="📂 فتح الانفنتوري", style=discord.ButtonStyle.primary, custom_id="persistent_inventory_button")
     async def open_inventory_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -241,6 +291,19 @@ class InventorySetupView(discord.ui.View):
 class InventoryCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    # أمر إداري لإرسال اللوحة الدائمة في الروم الحالي (لا تنتهي أبداً)
+    @app_commands.command(name="setup_inventory", description="إرسال لوحة الحقيبة الدائمة للسيرفر")
+    @app_commands.default_permissions(administrator=True)
+    async def setup_inventory(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="🎒 لوحة الحقيبة (Inventory)",
+            description="اضغط على الزر بالأسفل لفتح حقيبتك وإدارة رتبك وألقابك وصناديقك بكل سهولة ✨",
+            color=discord.Color.blue()
+        )
+        view = InventorySetupView()
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ تم إرسال لوحة الحقيبة الدائمة في الروم بنجاح!", ephemeral=True)
 
     @app_commands.command(name="inventory", description="فتح حقيبتك الشخصية")
     async def inventory_cmd(self, interaction: discord.Interaction):
