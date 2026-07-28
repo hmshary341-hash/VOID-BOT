@@ -92,12 +92,10 @@ async def open_chest_logic(interaction: discord.Interaction, chest_name: str):
     user_id = interaction.user.id
     user_data = get_user_inventory(user_id)
     
-    # التحقق مما إذا كان يملك الصندوق (لو مهو معه يقوله توكل بس)
     if user_data["boxes"].get(chest_name, 0) <= 0:
         await interaction.response.send_message(f"❌ توكل بس! ما معك صندوق **{chest_name}** 😂", ephemeral=True)
         return
 
-    # خصم صندوق واحد
     user_data["boxes"][chest_name] -= 1
     
     roll = random.uniform(0, 100)
@@ -212,12 +210,28 @@ class InventoryMainView(discord.ui.View):
             return
         
         user_data = get_user_inventory(self.user_id)
-        # تصفير الحقيبة أو اختيار عنصر للإزالة (تم جعلها لتصفير الرتب أو صناديق حسب الرغبة، أو إعطاء خيارات)
         user_data["boxes"] = {"الشائع": 0, "غير الشائع": 0, "النادر": 0, "الإيبك": 0, "الميثك": 0}
         user_data["ranks"] = []
         update_user_inventory(self.user_id, user_data)
         
         await interaction.response.send_message("🗑️ تم تنظيف حقيبتك وإزالة جميع الصناديق والرتب غير المفعلة بنجاح!", ephemeral=True)
+
+
+# الكلاس المطلوب لكي ينجح الاستيراد في main.py
+class InventorySetupView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🎒 فتح الحقيبة", style=discord.ButtonStyle.primary, custom_id="persistent_inventory_button")
+    async def open_inventory_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        user_data = get_user_inventory(interaction.user.id)
+        embed = discord.Embed(
+            title="🎒 نظام الحقيبة",
+            description=f"أهلاً بك يا {interaction.user.mention} في حقيبتك الخاصة ✨\n\n💰 الكوينز: **{user_data.get('coins', 0):,}**\n⭐ الـ XP: **{user_data.get('xp', 0):,}**",
+            color=discord.Color.blue()
+        )
+        view = InventoryMainView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class InventoryCog(commands.Cog):
