@@ -155,7 +155,7 @@ class TitlesSelect(discord.ui.Select):
         options = []
         for t in titles:
             is_active = (t == active_title)
-            options.append(discord.SelectOption(label=t, description="مفعل حالياً ✨" is_active else "موجود في حقيبتك", emoji="🪪"))
+            options.append(discord.SelectOption(label=t, description="مفعل حالياً ✨" if is_active else "موجود في حقيبتك", emoji="🪪"))
         if not options:
             options.append(discord.SelectOption(label="لا توجد ألقاب", value="none"))
         super().__init__(placeholder="اختر لقباً...", min_values=1, max_values=1, options=options)
