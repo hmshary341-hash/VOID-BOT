@@ -7,38 +7,34 @@ import asyncio
 import sqlite3
 from datetime import date
 
-# استيراد دوال الانفنتوري لتسجيل المشتريات والصناديق تلقائياً
 from cogs.inventory import add_title_to_inventory, add_rank_to_inventory, add_box_to_inventory
 
-# --- إعدادات مسار التخزين الدائم (Volume) لضمان عدم حذف البيانات ---
 DATA_DIR = "/app/data"
 os.makedirs(DATA_DIR, exist_ok=True)
 DATA_FILE = os.path.join(DATA_DIR, "economy.json")
 DB_PATH = os.path.join(DATA_DIR, "streaks.db")
 INVENTORY_FILE = os.path.join(DATA_DIR, "inventory.json")
 
-# --- أسعار وأتمتة المنتجات ---
 ROLES_SHOP = {
-    "ultra": {"name": "Ultra", "price": 75000, "role_id": 1530402702914490420},
-    "premio": {"name": "Premio", "price": 55000, "role_id": 1530404996451930153},
-    "prime": {"name": "Prime", "price": 45000, "role_id": 1530398293732102286},
-    "plus": {"name": "Plus", "price": 25000, "role_id": 1530397307206631605},
-    "basic": {"name": "Basic", "price": 10000, "role_id": 1530396937587523595}
+    "ultra": {"name": "Ultra", "price": 75000},
+    "premio": {"name": "Premio", "price": 55000},
+    "prime": {"name": "Prime", "price": 45000},
+    "plus": {"name": "Plus", "price": 25000},
+    "basic": {"name": "Basic", "price": 10000}
 }
 
 TITLES_SHOP = {
-    "king": {"name": "King", "price": 60000, "role_id": 1530407131507986554},
-    "queen": {"name": "Queen", "price": 60000, "role_id": 1530407411335172188}
+    "king": {"name": "King", "price": 60000},
+    "queen": {"name": "Queen", "price": 60000}
 }
 
-# إحتياجات الأعضاء (تتضمن درع الستريك والصناديق بالأسعار والقيود اليومية)
 NEEDS_SHOP = {
     "shield": {"name": "درع حماية الستريك", "price": 500, "type": "shield", "max_daily": 2},
-    "mythic_box": {"name": "الميثك", "price": 150000, "type": "chest", "chest_key": "mythic"},
-    "epic_box": {"name": "الإيبك", "price": 50000, "type": "chest", "chest_key": "epic"},
-    "rare_box": {"name": "النادر", "price": 20000, "type": "chest", "chest_key": "rare"},
-    "uncommon_box": {"name": "غير الشائع", "price": 7500, "type": "chest", "chest_key": "uncommon"},
-    "common_box": {"name": "الشائع", "price": 2000, "type": "chest", "chest_key": "common"}
+    "mythic_box": {"name": "الميثك", "price": 150000, "type": "chest", "chest_key": "الميثك"},
+    "epic_box": {"name": "الإيبك", "price": 50000, "type": "chest", "chest_key": "الإيبك"},
+    "rare_box": {"name": "النادر", "price": 20000, "type": "chest", "chest_key": "النادر"},
+    "uncommon_box": {"name": "غير الشائع", "price": 7500, "type": "chest", "chest_key": "غير الشائع"},
+    "common_box": {"name": "الشائع", "price": 2000, "type": "chest", "chest_key": "الشائع"}
 }
 
 def load_data():
@@ -87,7 +83,6 @@ def deduct_user_coins(user_id, amount):
             data[user_id]["coins"] = max(0, data[user_id].get("coins", 0) - amount)
         save_data(data)
 
-# --- قائمة الشراء التفاعلية داخل المتجر ---
 class PurchaseSelect(discord.ui.Select):
     def __init__(self, shop_type: str):
         self.shop_type = shop_type
@@ -141,10 +136,8 @@ class PurchaseSelect(discord.ui.Select):
 
         today = str(date.today())
 
-        # التحقق من القيود والحدود اليومية لإحتياجات الأعضاء
         if self.shop_type == "needs":
             if item.get("type") == "chest":
-                # التحقق من شراء الصناديق اليومي عبر inventory.json
                 inv_data = load_inventory_json()
                 uid = str(interaction.user.id)
                 if uid not in inv_data:
@@ -152,7 +145,7 @@ class PurchaseSelect(discord.ui.Select):
                 
                 user_inv = inv_data[uid]
                 if "daily_chests" not in user_inv or user_inv["daily_chests"].get("date") != today:
-                    user_inv["daily_chests"] = {"date": today, "common": False, "uncommon": False, "rare": False, "epic": False, "mythic": False}
+                    user_inv["daily_chests"] = {"date": today, "الشائع": False, "غير الشائع": False, "النادر": False, "الإيبك": False, "الميثك": False}
                 
                 chest_k = item["chest_key"]
                 if user_inv["daily_chests"].get(chest_k, False):
@@ -162,12 +155,10 @@ class PurchaseSelect(discord.ui.Select):
                     )
                     return
                 
-                # خصم الكوينز وتسجيل الشراء في inventory.json
                 deduct_user_coins(interaction.user.id, price)
                 user_inv["daily_chests"][chest_k] = True
                 save_inventory_json(inv_data)
                 
-                # إضافة الصندوق للحقيبة
                 add_box_to_inventory(interaction.user.id, item["name"], 1)
                 
                 await interaction.response.send_message(
@@ -177,7 +168,6 @@ class PurchaseSelect(discord.ui.Select):
                 return
 
             elif item.get("type") == "shield":
-                # التحقق من درع حماية الستريك عبر streaks.db
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -237,26 +227,12 @@ class PurchaseSelect(discord.ui.Select):
                 )
                 return
 
-        # خصم الكوينز للمنتجات العادية (الرتب والألقاب)
         deduct_user_coins(interaction.user.id, price)
-
-        role_given = False
         msg = f"🎉 مبروك! لقد اشتريت **{item['name']}** بنجاح مقابل **{price:,} كوينز**."
 
         if self.shop_type == "roles":
             add_rank_to_inventory(interaction.user.id, item["name"])
-            if item["role_id"] != 0:
-                role = interaction.guild.get_role(item["role_id"])
-                if role:
-                    try:
-                        await interaction.user.add_roles(role)
-                        role_given = True
-                    except Exception as e:
-                        print(f"❌ خطأ في إعطاء الرتبة: {e}")
-            if role_given:
-                msg += "\n✨ تم إضافة الرتبة إلى حقيبتك ومنحك إياها تلقائياً."
-            else:
-                msg += "\n📌 تم إضافة الرتبة إلى حقيبتك بنجاح."
+            msg += "\n📌 تم إضافة الرتبة إلى حقيبتك بنجاح (يمكنك تفعيلها من الانفنتوري)."
 
         elif self.shop_type == "titles":
             add_title_to_inventory(interaction.user.id, item["name"])
@@ -337,43 +313,14 @@ class StoreView(discord.ui.View):
         )
 
         await interaction.followup.send(f"تم فتح متجرك بنجاح: {channel.mention}", ephemeral=True)
-
         view = PurchaseView(shop_type)
 
         if shop_type == "roles":
-            await channel.send(
-                f"أهلاً بك يا {user.mention} في **متجر الرتب**!\n"
-                "إليك قائمة الرتب المتاحة للشراء:\n\n"
-                "🔥 **Ultra** - السعر: 75,000 كوينز\n"
-                "💎 **Premio** - السعر: 55,000 كوينز\n"
-                "🔹 **Prime** - السعر: 45,000 كوينز\n"
-                "🌟 **Plus** - السعر: 25,000 كوينز\n"
-                "⭐ **Basic** - السعر: 10,000 كوينز\n\n"
-                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
-                view=view
-            )
+            await channel.send(f"أهلاً بك يا {user.mention} في **متجر الرتب**!\nاختر الرتبة التي تريد إضافتها لحقيبتك:", view=view)
         elif shop_type == "titles":
-            await channel.send(
-                f"أهلاً بك يا {user.mention} في **متجر الألقاب**!\n"
-                "إليك قائمة الألقاب المتاحة للشراء:\n\n"
-                "👑 **King** - السعر: 60,000 كوينز\n"
-                "👑 **Queen** - السعر: 60,000 كوينز\n\n"
-                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
-                view=view
-            )
+            await channel.send(f"أهلاً بك يا {user.mention} في **متجر الألقاب**!\nاختر اللقب الذي تريد إضافته لحقيبتك:", view=view)
         else:
-            await channel.send(
-                f"أهلاً بك يا {user.mention} في قسم **إحتياجات الأعضاء**!\n"
-                "إليك المنتجات والصناديق المتاحة للشراء *(صندوق واحد من كل نوع يومياً)*:\n\n"
-                "🛡️ **درع حماية الستريك** - السعر: 500 كوينز *(حد أقصى درعين يومياً)*\n"
-                "📦 **الميثك** - السعر: 150,000 كوينز\n"
-                "📦 **الإيبك** - السعر: 50,000 كوينز\n"
-                "📦 **النادر** - السعر: 20,000 كوينز\n"
-                "📦 **غير الشائع** - السعر: 7,500 كوينز\n"
-                "📦 **الشائع** - السعر: 2,000 كوينز\n\n"
-                "👇 **يمكنك الشراء أو قفل المتجر عبر الأزرار أدناه:**",
-                view=view
-            )
+            await channel.send(f"أهلاً بك يا {user.mention} في **إحتياجات الأعضاء**!\nاختر ما ترغب بشرائه:", view=view)
 
 class Shop(commands.Cog):
     def __init__(self, bot):
@@ -383,10 +330,7 @@ class Shop(commands.Cog):
     @app_commands.default_permissions(administrator=True)
     async def store_panel(self, interaction: discord.Interaction):
         view = StoreView()
-        await interaction.response.send_message(
-            "**مرحباً بك في متجر السيرفر!**\nاختر المتجر الذي ترغب في فتحه من الأزرار بالأسفل:", 
-            view=view
-        )
+        await interaction.response.send_message("**مرحباً بك في متجر السيرفر!**\nاختر المتجر الذي ترغب في فتحه من الأزرار بالأسفل:", view=view)
 
 async def setup(bot):
     await bot.add_cog(Shop(bot))
