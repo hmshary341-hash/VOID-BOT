@@ -14,23 +14,23 @@ LEVELS_FILE = os.path.join(DATA_DIR, "levels.json")
 # --- آي دي روم المستويات المحدد ---
 LEVEL_CHANNEL_ID = 1530087509407563797
 
-# --- ربط المستويات بأسماء الرتب (البحث التلقائي بالاسم) ---
+# --- ربط المستويات بـ ID الرتب الحقيقية ---
 LEVEL_ROLES = {
-    5: "Bronze",
-    10: "Silver",
-    15: "Gold",
-    20: "Platinum",
-    25: "Emerald",
-    30: "Sapphire",
-    35: "Ruby",
-    40: "Diamond",
-    45: "Crystal",
-    50: "Master",
-    55: "Elite",
-    60: "Champion",
-    65: "Legend",
-    70: "Mythic",
-    75: "Eternal",
+    5: 1530008104685797590,   # Bronze
+    10: 1530008183945302117,  # Silver
+    15: 1530008271975350363,  # Gold
+    20: 1530008351050694817,  # Platinum
+    25: 1530008428989124730,  # Emerald
+    30: 1530008495129235486,  # Sapphire
+    35: 1530008599596892241,  # Ruby
+    40: 1530008670073524225,  # Diamond
+    45: 1530008756128186579,  # Crystal
+    50: 1530008866140586167,  # Master
+    55: 1530009021950464060,  # Elite
+    60: 1530009099956125766,  # Champion
+    65: 1530009307343487116,  # Legend
+    70: 1530009373584396490,  # Mythic
+    75: 1530009463832973465,  # Eternal
 }
 
 
@@ -87,15 +87,18 @@ class Leveling(commands.Cog):
       new_level = user_data["level"]
       save_data(data)
 
-      # البحث عن الرتبة وإعطاؤها تلقائياً
-      role_name = LEVEL_ROLES.get(new_level, "")
-      if role_name:
-        role = discord.utils.get(message.guild.roles, name=role_name)
+      # البحث عن الرتبة بالـ ID وإعطاؤها تلقائياً
+      role_id = LEVEL_ROLES.get(new_level)
+      if role_id:
+        role = message.guild.get_role(role_id)
         if role:
           try:
             await message.author.add_roles(role)
+            print(f"✅ تم منح رتبة {role.name} للعضو {message.author.display_name} بنجاح!")
           except Exception as e:
-            print(f"❌ خطأ في إعطاء الرتبة: {e}")
+            print(f"❌ خطأ تقني: لم يتمكن البوت من منح الرتبة (تأكد من صلاحيات البوت وترتيب الرتب): {e}")
+        else:
+          print(f"⚠️ تنبيه: الرتبة بالـ ID ({role_id}) غير موجودة في السيرفر!")
 
       # إرسال رسالة التلفيل حصرياً في الروم المحدد
       target_channel = message.guild.get_channel(LEVEL_CHANNEL_ID)
@@ -146,9 +149,11 @@ class Leveling(commands.Cog):
 
     # معرفة الرتبة الحالية للعضو إن وجدت ضمن القائمة
     role_name = "لا يوجد"
-    for lvl, r_name in sorted(LEVEL_ROLES.items(), reverse=True):
+    for lvl, r_id in sorted(LEVEL_ROLES.items(), reverse=True):
       if current_level >= lvl:
-        role_name = r_name
+        r = interaction.guild.get_role(r_id)
+        if r:
+          role_name = r.name
         break
 
     await interaction.followup.send(
