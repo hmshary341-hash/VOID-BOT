@@ -1,4 +1,4 @@
-# Refresh Update - لتحديث البوت وإلغاء التعليق
+# Refresh Update - لتحديث البوت وإلغاء التعليق وتوسيع نظام اللوجز
 import time
 import discord
 from discord.ext import commands
@@ -28,7 +28,7 @@ class AntiNuke(commands.Cog):
         pass
     return channel
 
-  # --- 1. نظام مراقبة الإداريين (العقوبات وإزالتها) ---
+  # --- 1. نظام مراقبة الإداريين الشامل (العقوبات، السجن، وإزالتها) ---
   @commands.Cog.listener()
   async def on_audit_log_entry_create(self, entry):
     try:
@@ -134,10 +134,92 @@ class AntiNuke(commands.Cog):
           embed.set_footer(text="نظام مراقبة الإدارة")
           await log_channel.send(embed=embed)
 
+      # هـ) رصد السجن/فك السجن وتعديل الرتب (Jail / Role Updates)
+      elif entry.action == discord.AuditLogAction.member_role_update:
+        # تتبع إضافة أو إزالة الرتب (مثل رتبة السجن)
+        changes = entry.changes
+        for change in changes:
+          if change.key == "roles":
+            # يمكن معرفة الرتب المضافة أو المزالة عبر التغييرات
+            before_roles = change.before if hasattr(change, "before") else []
+            after_roles = change.after if hasattr(change, "after") else []
+            
+            added_roles = [r for r in after_roles if r not in before_roles]
+            removed_roles = [r for r in before_roles if r not in after_roles]
+
+            for role in added_roles:
+              embed = discord.Embed(
+                  title="🚨 تنبيه: تم إعطاء رتبة / سجن عضو!",
+                  color=discord.Color.purple(),
+                  timestamp=discord.utils.utcnow(),
+              )
+              embed.add_field(name="نوع الإجراء", value="تعديل رتب / سجن", inline=False)
+              embed.add_field(name="اسم الإداري", value=admin_str, inline=False)
+              embed.add_field(name="العضو", value=target_str, inline=False)
+              embed.add_field(name="الرتبة المضافة", value=f"`{role.name}`", inline=False)
+              embed.set_footer(text="نظام مراقبة الإدارة")
+              await log_channel.send(embed=embed)
+
+            for role in removed_roles:
+              embed = discord.Embed(
+                  title="🚨 تنبيه: تم إزالة رتبة / فك سجن عن عضو!",
+                  color=discord.Color.teal(),
+                  timestamp=discord.utils.utcnow(),
+              )
+              embed.add_field(name="نوع الإجراء", value="إزالة رتبة / فك سجن", inline=False)
+              embed.add_field(name="اسم الإداري (المسؤول)", value=admin_str, inline=False)
+              embed.add_field(name="العضو", value=target_str, inline=False)
+              embed.add_field(name="الرتبة المزالة", value=f"`{role.name}`", inline=False)
+              embed.set_footer(text="نظام مراقبة الإدارة")
+              await log_channel.send(embed=embed)
+
     except Exception as e:
       print(f"❌ خطأ في نظام مراقبة السجل: {e}")
 
-  # --- 2. نظام الدفاع والتصدّي التلقائي للهجمات ---
+  # --- 2. نظام أوامر التحذيرات (Warnings & Unwarnings) ---
+  @commands.command(name="warn")
+  @commands.has_permissions(kick_members=True)
+  async def warn_member(self, ctx, member: discord.Member, *, reason="بدون سبب"):
+    log_channel = await self.get_log_channel()
+    
+    embed = discord.Embed(
+        title="⚠️ تنبيه: تم تحذير عضو!",
+        color=discord.Color.gold(),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.add_field(name="نوع الإجراء", value="تحذير (Warn)", inline=False)
+    embed.add_field(name="الإداري المحذر", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
+    embed.add_field(name="العضو المحذر", value=f"{member.mention} (`{member}`)", inline=False)
+    embed.add_field(name="السبب", value=reason, inline=False)
+    embed.set_footer(text="نظام التحذيرات الإدارية")
+    
+    if log_channel:
+      await log_channel.send(embed=embed)
+    
+    await ctx.send(f"✅ تم تحذير العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", delete_after=5)
+
+  @commands.command(name="unwarn", name_aliases=["delwarn"])
+  @commands.has_permissions(kick_members=True)
+  async def unwarn_member(self, ctx, member: discord.Member, *, reason="إلغاء التحذير"):
+    log_channel = await self.get_log_channel()
+    
+    embed = discord.Embed(
+        title="♻️ تنبيه: تم إزالة تحذير عن عضو!",
+        color=discord.Color.blue(),
+        timestamp=discord.utils.utcnow(),
+    )
+    embed.add_field(name="نوع الإجراء", value="إلغاء تحذير (Unwarn)", inline=False)
+    embed.add_field(name="الإداري المسؤول", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
+    embed.add_field(name="العضو", value=f"{member.mention} (`{member}`)", inline=False)
+    embed.add_field(name="التفاصيل/السبب", value=reason, inline=False)
+    embed.set_footer(text="نظام التحذيرات الإدارية")
+    
+    if log_channel:
+      await log_channel.send(embed=embed)
+    
+    await ctx.send(f"✅ تم إزالة التحذير عن العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", delete_after=5)
+
+  # --- 3. نظام الدفاع والتصدّي التلقائي للهجمات ---
   @commands.Cog.listener()
   async def on_member_join(self, member):
     global recent_joins
@@ -165,7 +247,7 @@ class AntiNuke(commands.Cog):
           embed_alert = discord.Embed(
               title="🚨 إنذار هجوم بوتات وهمية (Raid Detected)!",
               description=(
-                  "تم رصد هجوم وتم قفل السيرفر **تلقائياً**.\n"
+                  "تم رجوم هجوم وتم قفل السيرفر **تلقائياً**.\n"
                   "🛡️ **غرفة العمليات:** تم ترك الرومات مفتوحة لكم للسيطرة على"
                   " الوضع."
               ),
@@ -179,7 +261,7 @@ class AntiNuke(commands.Cog):
       except:
         pass
 
-  # --- 3. أمر فتح السيرفر (Unlock) ---
+  # --- 4. أمر فتح السيرفر (Unlock) ---
   @commands.command(name="unlock")
   @commands.has_permissions(administrator=True)
   async def unlock(self, ctx):
