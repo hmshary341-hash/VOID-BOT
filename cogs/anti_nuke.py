@@ -1,6 +1,7 @@
-# Refresh Update - لتحديث البوت وإلغاء التعليق وتوسيع نظام اللوجز
+# Refresh Update - نظام مكافحة الفساد واللوجز (أوامر السلاش)
 import time
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 # متغير عام لتتبع هجمات البوتات الوهمية
@@ -136,11 +137,9 @@ class AntiNuke(commands.Cog):
 
       # هـ) رصد السجن/فك السجن وتعديل الرتب (Jail / Role Updates)
       elif entry.action == discord.AuditLogAction.member_role_update:
-        # تتبع إضافة أو إزالة الرتب (مثل رتبة السجن)
         changes = entry.changes
         for change in changes:
           if change.key == "roles":
-            # يمكن معرفة الرتب المضافة أو المزالة عبر التغييرات
             before_roles = change.before if hasattr(change, "before") else []
             after_roles = change.after if hasattr(change, "after") else []
             
@@ -176,10 +175,14 @@ class AntiNuke(commands.Cog):
     except Exception as e:
       print(f"❌ خطأ في نظام مراقبة السجل: {e}")
 
-  # --- 2. نظام أوامر التحذيرات (Warnings & Unwarnings) ---
-  @commands.command(name="warn")
-  @commands.has_permissions(kick_members=True)
-  async def warn_member(self, ctx, member: discord.Member, *, reason="بدون سبب"):
+  # --- 2. أوامر التحذيرات بنظام السلاش (Slash Commands) ---
+  @app_commands.command(name="warn", description="تحذير عضو وتسجيله في اللوجز")
+  @app_commands.describe(member="العضو المراد تحذيره", reason="سبب التحذير")
+  async def warn_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "بدون سبب"):
+    if not interaction.user.guild_permissions.kick_members:
+      await interaction.response.send_message("❌ ليس لديك صلاحية لاستخدام هذا الأمر.", ephemeral=True)
+      return
+
     log_channel = await self.get_log_channel()
     
     embed = discord.Embed(
@@ -188,7 +191,7 @@ class AntiNuke(commands.Cog):
         timestamp=discord.utils.utcnow(),
     )
     embed.add_field(name="نوع الإجراء", value="تحذير (Warn)", inline=False)
-    embed.add_field(name="الإداري المحذر", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
+    embed.add_field(name="الإداري المحذر", value=f"{interaction.user.mention} (`{interaction.user}`)", inline=False)
     embed.add_field(name="العضو المحذر", value=f"{member.mention} (`{member}`)", inline=False)
     embed.add_field(name="السبب", value=reason, inline=False)
     embed.set_footer(text="نظام التحذيرات الإدارية")
@@ -196,11 +199,15 @@ class AntiNuke(commands.Cog):
     if log_channel:
       await log_channel.send(embed=embed)
     
-    await ctx.send(f"✅ تم تحذير العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", delete_after=5)
+    await interaction.response.send_message(f"✅ تم تحذير العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", ephemeral=True)
 
-  @commands.command(name="unwarn", name_aliases=["delwarn"])
-  @commands.has_permissions(kick_members=True)
-  async def unwarn_member(self, ctx, member: discord.Member, *, reason="إلغاء التحذير"):
+  @app_commands.command(name="unwarn", description="إزالة تحذير عن عضو وتسجيله في اللوجز")
+  @app_commands.describe(member="العضو المراد إزالة التحذير عنه", reason="سبب الإلغاء")
+  async def unwarn_member(self, interaction: discord.Interaction, member: discord.Member, reason: str = "إلغاء التحذير"):
+    if not interaction.user.guild_permissions.kick_members:
+      await interaction.response.send_message("❌ ليس لديك صلاحية لاستخدام هذا الأمر.", ephemeral=True)
+      return
+
     log_channel = await self.get_log_channel()
     
     embed = discord.Embed(
@@ -209,7 +216,7 @@ class AntiNuke(commands.Cog):
         timestamp=discord.utils.utcnow(),
     )
     embed.add_field(name="نوع الإجراء", value="إلغاء تحذير (Unwarn)", inline=False)
-    embed.add_field(name="الإداري المسؤول", value=f"{ctx.author.mention} (`{ctx.author}`)", inline=False)
+    embed.add_field(name="الإداري المسؤول", value=f"{interaction.user.mention} (`{interaction.user}`)", inline=False)
     embed.add_field(name="العضو", value=f"{member.mention} (`{member}`)", inline=False)
     embed.add_field(name="التفاصيل/السبب", value=reason, inline=False)
     embed.set_footer(text="نظام التحذيرات الإدارية")
@@ -217,7 +224,7 @@ class AntiNuke(commands.Cog):
     if log_channel:
       await log_channel.send(embed=embed)
     
-    await ctx.send(f"✅ تم إزالة التحذير عن العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", delete_after=5)
+    await interaction.response.send_message(f"✅ تم إزالة التحذير عن العضو {member.mention} بنجاح وتسجيل ذلك في اللوجز.", ephemeral=True)
 
   # --- 3. نظام الدفاع والتصدّي التلقائي للهجمات ---
   @commands.Cog.listener()
@@ -247,7 +254,7 @@ class AntiNuke(commands.Cog):
           embed_alert = discord.Embed(
               title="🚨 إنذار هجوم بوتات وهمية (Raid Detected)!",
               description=(
-                  "تم رجوم هجوم وتم قفل السيرفر **تلقائياً**.\n"
+                  "تم رصد هجوم وتم قفل السيرفر **تلقائياً**.\n"
                   "🛡️ **غرفة العمليات:** تم ترك الرومات مفتوحة لكم للسيطرة على"
                   " الوضع."
               ),
@@ -261,15 +268,18 @@ class AntiNuke(commands.Cog):
       except:
         pass
 
-  # --- 4. أمر فتح السيرفر (Unlock) ---
-  @commands.command(name="unlock")
-  @commands.has_permissions(administrator=True)
-  async def unlock(self, ctx):
-    for channel in ctx.guild.text_channels:
+  # --- 4. أمر فتح السيرفر بنظام السلاش (Unlock) ---
+  @app_commands.command(name="unlock", description="إلغاء وضع الطوارئ وفتح السيرفر")
+  async def unlock(self, interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+      await interaction.response.send_message("❌ ليس لديك صلاحية لاستخدام هذا الأمر.", ephemeral=True)
+      return
+
+    for channel in interaction.guild.text_channels:
       try:
-        await channel.set_permissions(ctx.guild.default_role, send_messages=True)
+        await channel.set_permissions(interaction.guild.default_role, send_messages=True)
         for role_id in self.management_roles:
-          role = ctx.guild.get_role(role_id)
+          role = interaction.guild.get_role(role_id)
           if role:
             await channel.set_permissions(role, send_messages=True)
       except Exception:
@@ -280,7 +290,7 @@ class AntiNuke(commands.Cog):
         description="تم فتح الكتابة في جميع الرومات للجميع. عاد كل شيء لطبيعته.",
         color=discord.Color.green(),
     )
-    await ctx.send(embed=embed)
+    await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):
