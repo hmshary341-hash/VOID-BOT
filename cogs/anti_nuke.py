@@ -34,6 +34,7 @@ class AntiNuke(commands.Cog):
       log_channel = await self.get_log_channel()
       if not log_channel:
         return
+        .
 
       admin = entry.user
 
