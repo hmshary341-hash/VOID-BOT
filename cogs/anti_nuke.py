@@ -1,3 +1,4 @@
+# Refresh Update - لتحديث البوت وإلغاء التعليق
 import time
 import discord
 from discord.ext import commands
@@ -34,7 +35,6 @@ class AntiNuke(commands.Cog):
       log_channel = await self.get_log_channel()
       if not log_channel:
         return
-      
 
       admin = entry.user
 
