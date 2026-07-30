@@ -3,35 +3,38 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-# --- الإعدادات (أسماء الرتب المسموح لها حصرياً دون إداريي الإيفنت) ---
-ALLOWED_ROLES = [
-    "Owner",
-    "Co-Owner",
-    "Support Manager",
-    "Senior Support",
-    "Support Staff",
+# --- الإعدادات (آي دي الرتب المسموح لها حصرياً بالأوامر) ---
+ALLOWED_ROLE_IDS = [
+    1531823302824427561,  # رتبتك
+    1531824508770455683,  # رتبة نائبتك
+    1531824107413573763,  # رتبة نائبك
+    1529997933011795968,  # آي دي إدارة الدعم
+    1529998973539057785,  # الآي دي الأول
+    1529999244155420763,  # الآي دي الثاني
 ]
+
+ALLOWED_USER_IDS = []
 
 # --- أسماء رتب السجن والتحذيرات ---
 PRISON_ROLE_NAME = "Prison"
-
 WARN_ROLE_1_NAME = "تحذير 1"
 WARN_ROLE_2_NAME = "تحذير 2"
 WARN_ROLE_3_NAME = "تحذير 3"
 
 
-# --- دالة التحقق من الصلاحية ---
+# --- دالة التحقق من الصلاحية عبر الأي دي ---
 def admin_only():
   async def predicate(interaction: discord.Interaction):
     if interaction.user.guild_permissions.administrator:
       return True
-
-    user_role_names = [role.name for role in interaction.user.roles]
-    if any(role_name in user_role_names for role_name in ALLOWED_ROLES):
+    if interaction.user.id in ALLOWED_USER_IDS:
+      return True
+    user_role_ids = [role.id for role in interaction.user.roles]
+    if any(role_id in user_role_ids for role_id in ALLOWED_ROLE_IDS):
       return True
 
     await interaction.response.send_message(
-        "❌ عذراً، هذا الأمر مخصص للإدارة العليا وطاقم الدعم (Support) فقط.",
+        "❌ عذراً، هذا الأمر مخصص للإدارة العليا وطاقم الدعم فقط.",
         ephemeral=True,
     )
     return False
@@ -44,7 +47,6 @@ class Admin(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-  # تعريف مجموعة أوامر الإدارة الأساسية
   admin = app_commands.Group(
       name="admin", description="أوامر الإدارة والإشراف والعقوبات"
   )
@@ -74,6 +76,8 @@ class Admin(commands.Cog):
           ephemeral=True,
       )
 
+    full_reason = f"بواسطة: {interaction.user} | السبب: {reason}"
+
     try:
       if r3 in member.roles:
         return await interaction.followup.send(
@@ -81,15 +85,15 @@ class Admin(commands.Cog):
             ephemeral=True,
         )
       elif r2 in member.roles:
-        await member.remove_roles(r2)
-        await member.add_roles(r3)
+        await member.remove_roles(r2, reason=full_reason)
+        await member.add_roles(r3, reason=full_reason)
         warning_level = "تحذير 3"
       elif r1 in member.roles:
-        await member.remove_roles(r1)
-        await member.add_roles(r2)
+        await member.remove_roles(r1, reason=full_reason)
+        await member.add_roles(r2, reason=full_reason)
         warning_level = "تحذير 2"
       else:
-        await member.add_roles(r1)
+        await member.add_roles(r1, reason=full_reason)
         warning_level = "تحذير 1"
 
       await interaction.followup.send(
@@ -132,18 +136,20 @@ class Admin(commands.Cog):
           ephemeral=True,
       )
 
+    full_reason = f"بواسطة: {interaction.user} | السبب: {reason}"
+
     try:
       if r3 in member.roles:
-        await member.remove_roles(r3)
-        await member.add_roles(r2)
-        warning_level = "تحذير 2"
+        await member.remove_roles(r3, reason=full_reason)
+        await member.add_roles(r2, reason=full_reason)
+        warning_level = "تحذير 2 (تخفيض)"
       elif r2 in member.roles:
-        await member.remove_roles(r2)
-        await member.add_roles(r1)
-        warning_level = "تحذير 1"
+        await member.remove_roles(r2, reason=full_reason)
+        await member.add_roles(r1, reason=full_reason)
+        warning_level = "تحذير 1 (تخفيض)"
       elif r1 in member.roles:
-        await member.remove_roles(r1)
-        warning_level = "بدون تحذيرات (تمت إزالة جميع التحذيرات)"
+        await member.remove_roles(r1, reason=full_reason)
+        warning_level = "إزالة جميع التحذيرات"
       else:
         return await interaction.followup.send(
             f"❌ العضو {member.mention} ليس لديه أي تحذيرات لإزالتها.",
@@ -151,13 +157,13 @@ class Admin(commands.Cog):
         )
 
       await interaction.followup.send(
-          f"✅ تم تحديث حالة العضو {member.mention} وأصبح الآن: **{warning_level}**. السبب: {reason}",
+          f"✅ تم تحديث حالة العضو {member.mention}. السبب: {reason}",
           ephemeral=True,
       )
 
       try:
         await member.send(
-            f"✅ تم تخفيض أو إزالة تحذير منك في سيرفر **{interaction.guild.name}**.\nالحالة الجديدة: **{warning_level}**\nالسبب: {reason}"
+            f"✅ تم تخفيض أو إزالة تحذير منك في سيرفر **{interaction.guild.name}**.\nالسبب: {reason}"
         )
       except:
         pass
@@ -181,8 +187,11 @@ class Admin(commands.Cog):
       reason: str = "لا يوجد",
   ):
     await interaction.response.defer(ephemeral=True)
+    full_reason = f"بواسطة: {interaction.user} | السبب: {reason}"
     try:
-      await member.timeout(datetime.timedelta(minutes=minutes), reason=reason)
+      await member.timeout(
+          datetime.timedelta(minutes=minutes), reason=full_reason
+      )
       await interaction.followup.send(
           f"🔇 تم إسكات {member.mention} بنجاح.", ephemeral=True
       )
@@ -198,8 +207,9 @@ class Admin(commands.Cog):
       self, interaction: discord.Interaction, member: discord.Member
   ):
     await interaction.response.defer(ephemeral=True)
+    full_reason = f"بواسطة: {interaction.user} | فك التايم أوت"
     try:
-      await member.timeout(None)
+      await member.timeout(None, reason=full_reason)
       await interaction.followup.send(
           f"✅ تم فك السكات عن {member.mention}.", ephemeral=True
       )
@@ -220,8 +230,9 @@ class Admin(commands.Cog):
       reason: str = "لا يوجد",
   ):
     await interaction.response.defer(ephemeral=True)
+    full_reason = f"بواسطة: {interaction.user} | السبب: {reason}"
     try:
-      await member.ban(reason=reason)
+      await member.ban(reason=full_reason)
       await interaction.followup.send(
           f"🔨 تم حظر {member.mention} بنجاح.", ephemeral=True
       )
@@ -237,7 +248,8 @@ class Admin(commands.Cog):
     try:
       target_id = int(user_id.strip("<@!>"))
       user = await self.bot.fetch_user(target_id)
-      await interaction.guild.unban(user)
+      full_reason = f"بواسطة: {interaction.user} | فك الحظر"
+      await interaction.guild.unban(user, reason=full_reason)
       await interaction.followup.send(
           "✅ تم فك الحظر عن المستخدم بنجاح.", ephemeral=True
       )
@@ -261,8 +273,9 @@ class Admin(commands.Cog):
           "❌ رتبة السجن غير موجودة، تأكد من مطابقة اسم الرتبة في الكود.",
           ephemeral=True,
       )
+    full_reason = f"بواسطة: {interaction.user} | سجن"
     try:
-      await member.add_roles(role)
+      await member.add_roles(role, reason=full_reason)
       await interaction.followup.send(
           f"⛓️ تم سجن {member.mention} بنجاح.", ephemeral=True
       )
@@ -284,8 +297,9 @@ class Admin(commands.Cog):
           "❌ رتبة السجن غير موجودة، تأكد من مطابقة اسم الرتبة في الكود.",
           ephemeral=True,
       )
+    full_reason = f"بواسطة: {interaction.user} | إفراج من السجن"
     try:
-      await member.remove_roles(role)
+      await member.remove_roles(role, reason=full_reason)
       await interaction.followup.send(
           f"🔓 تم الإفراج عن {member.mention} بنجاح.", ephemeral=True
       )
@@ -308,7 +322,7 @@ class Admin(commands.Cog):
       await channel.set_permissions(
           interaction.guild.default_role,
           send_messages=False,
-          reason=f"تم القفل بواسطة {interaction.user}",
+          reason=f"بواسطة: {interaction.user}",
       )
       await interaction.followup.send("🔒 تم قفل الشات بنجاح.", ephemeral=True)
       await channel.send("🔒 **تم قفل هذه القناة من قبل الإدارة.**")
@@ -328,7 +342,7 @@ class Admin(commands.Cog):
       await channel.set_permissions(
           interaction.guild.default_role,
           send_messages=True,
-          reason=f"تم الفتح بواسطة {interaction.user}",
+          reason=f"بواسطة: {interaction.user}",
       )
       await interaction.followup.send("🔓 تم فتح الشات بنجاح.", ephemeral=True)
       await channel.send("🔓 **تم فتح هذه القناة.**")
@@ -345,7 +359,9 @@ class Admin(commands.Cog):
   async def hide(self, interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await interaction.channel.set_permissions(
-        interaction.guild.default_role, view_channel=False
+        interaction.guild.default_role,
+        view_channel=False,
+        reason=f"بواسطة: {interaction.user}",
     )
     await interaction.followup.send("🙈 تم إخفاء القناة.", ephemeral=True)
 
@@ -354,7 +370,9 @@ class Admin(commands.Cog):
   async def show(self, interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     await interaction.channel.set_permissions(
-        interaction.guild.default_role, view_channel=True
+        interaction.guild.default_role,
+        view_channel=True,
+        reason=f"بواسطة: {interaction.user}",
     )
     await interaction.followup.send("👁️ تم إظهار القناة.", ephemeral=True)
 
@@ -370,8 +388,9 @@ class Admin(commands.Cog):
       reason: str = "لا يوجد",
   ):
     await interaction.response.defer(ephemeral=True)
+    full_reason = f"بواسطة: {interaction.user} | السبب: {reason}"
     try:
-      await member.kick(reason=reason)
+      await member.kick(reason=full_reason)
       await interaction.followup.send(
           f"🦵 تم طرد {member.mention} بنجاح.", ephemeral=True
       )
@@ -397,9 +416,7 @@ class Admin(commands.Cog):
 
   @admin.command(
       name="modhistory",
-      description=(
-          "فحص سجلات العضو لمعرفة من أعطاه تحذير أو تايم أوت أو عقوبة"
-      ),
+      description="فحص سجلات العضو عبر سجل السيرفر الرسمي مع إظهار المسؤول",
   )
   @admin_only()
   async def modhistory(
@@ -408,7 +425,7 @@ class Admin(commands.Cog):
     await interaction.response.defer(ephemeral=True)
 
     embed = discord.Embed(
-        title=f"📜 سجل العقوبات لـ {member.display_name}",
+        title=f"📜 سجل العقوبات الرسمي لـ {member.display_name}",
         color=discord.Color.blue(),
         timestamp=datetime.datetime.now(datetime.timezone.utc),
     )
@@ -416,83 +433,54 @@ class Admin(commands.Cog):
     actions_found = 0
 
     try:
-      async for entry in interaction.guild.audit_logs(limit=150):
+      async for entry in interaction.guild.audit_logs(limit=100):
         if entry.target and entry.target.id == member.id:
+          action_title = None
+          reason_text = entry.reason or "لا يوجد سبب مسجل"
+
           if entry.action == discord.AuditLogAction.kick:
-            embed.add_field(
-                name="🦵 طرد (Kick)",
-                value=(
-                    f"المسؤول: {entry.user.mention}\nالسبب:"
-                    f" {entry.reason or 'لا يوجد'}"
-                ),
-                inline=False,
-            )
-            actions_found += 1
+            action_title = "🦵 طرد (Kick)"
           elif entry.action == discord.AuditLogAction.ban:
-            embed.add_field(
-                name="🔨 حظر (Ban)",
-                value=(
-                    f"المسؤول: {entry.user.mention}\nالسبب:"
-                    f" {entry.reason or 'لا يوجد'}"
-                ),
-                inline=False,
-            )
-            actions_found += 1
+            action_title = "🔨 حظر (Ban)"
           elif entry.action == discord.AuditLogAction.member_update:
             if entry.after and getattr(
                 entry.after, "communication_disabled_until", None
             ):
-              embed.add_field(
-                  name="🔇 تايم أوت (Timeout)",
-                  value=(
-                      f"المسؤول: {entry.user.mention}\nالسبب:"
-                      f" {entry.reason or 'لا يوجد'}"
-                  ),
-                  inline=False,
-              )
-              actions_found += 1
+              action_title = "🔇 تايم أوت (Timeout)"
           elif entry.action == discord.AuditLogAction.member_role_update:
             if entry.after and getattr(entry.after, "roles", None):
               role_names = [r.name for r in entry.after.roles]
-              target_names = [
-                  WARN_ROLE_1_NAME,
-                  WARN_ROLE_2_NAME,
-                  WARN_ROLE_3_NAME,
-                  PRISON_ROLE_NAME,
-              ]
-              for r_name in target_names:
-                if r_name in role_names:
-                  display_name = (
-                      "تحذير 1"
-                      if r_name == WARN_ROLE_1_NAME
-                      else (
-                          "تحذير 2"
-                          if r_name == WARN_ROLE_2_NAME
-                          else (
-                              "تحذير 3"
-                              if r_name == WARN_ROLE_3_NAME
-                              else "سجن"
-                          )
-                      )
-                  )
-                  embed.add_field(
-                      name=f"⚠️ رتبة إدارية ({display_name})",
-                      value=f"المسؤول: {entry.user.mention}",
-                      inline=False,
-                  )
-                  actions_found += 1
-                  break
+              if PRISON_ROLE_NAME in role_names:
+                action_title = "⛓️ سجن (Prison)"
+              elif any(
+                  r in role_names
+                  for r in [
+                      WARN_ROLE_1_NAME,
+                      WARN_ROLE_2_NAME,
+                      WARN_ROLE_3_NAME,
+                  ]
+              ):
+                action_title = "⚠️ رتبة تحذير / إدارية"
+
+          if action_title:
+            embed.add_field(
+                name=action_title,
+                value=f"📝 **التفاصيل:** {reason_text}",
+                inline=False,
+            )
+            actions_found += 1
 
       if actions_found == 0:
         embed.description = (
-            "لا توجد سجلات عقوبات أو تحذيرات أو تايم أوت حديثة مسجلة لهذا العضو"
-            " في سجل السيرفر."
+            "لا توجد سجلات عقوبات حديثة مسجلة لهذا العضو في سجل السيرفر الرسمي."
         )
 
       await interaction.followup.send(embed=embed, ephemeral=True)
 
     except Exception as e:
-      await interaction.followup.send(f"❌ حدث خطأ تقني:\n`{e}`", ephemeral=True)
+      await interaction.followup.send(
+          f"❌ حدث خطأ أثناء جلب السجلات:\n`{e}`", ephemeral=True
+      )
 
 
 async def setup(bot):
