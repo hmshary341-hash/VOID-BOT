@@ -406,7 +406,7 @@ class Admin(commands.Cog):
     try:
       deleted = await interaction.channel.purge(limit=amount)
       await interaction.followup.send(
-          f"🗑️ تم حذف {len(deleted)} رسالة بنجاح.", ephemeral=True
+          `🗑️ تم حذف ${len(deleted)} رسالة بنجاح.`, ephemeral=True
       )
     except Exception:
       await interaction.followup.send(
@@ -416,7 +416,7 @@ class Admin(commands.Cog):
 
   @admin.command(
       name="modhistory",
-      description="فحص سجلات العضو عبر سجل السيرفر الرسمي مع إظهار المسؤول",
+      description="فحص سجلات العضو مرتبة (باند، تايم أوت، سجن، كيك، تحذير) مع المسؤول",
   )
   @admin_only()
   async def modhistory(
@@ -425,55 +425,74 @@ class Admin(commands.Cog):
     await interaction.response.defer(ephemeral=True)
 
     embed = discord.Embed(
-        title=f"📜 سجل العقوبات الرسمي لـ {member.display_name}",
+        title=f"📜 سجل العقوبات المنظم لـ {member.display_name}",
         color=discord.Color.blue(),
         timestamp=datetime.datetime.now(datetime.timezone.utc),
     )
 
-    actions_found = 0
+    # قوائم لتخزين العقوبات حسب التصنيف المطلوب
+    bans = []
+    timeouts = []
+    prisons = []
+    kicks = []
+    warns = []
 
     try:
-      async for entry in interaction.guild.audit_logs(limit=100):
+      async for entry in interaction.guild.audit_logs(limit=150):
         if entry.target and entry.target.id == member.id:
-          action_title = None
-          reason_text = entry.reason or "لا يوجد سبب مسجل"
+          moderator = entry.user
+          reason = entry.reason or "لا يوجد سبب مسجل"
 
-          if entry.action == discord.AuditLogAction.kick:
-            action_title = "🦵 طرد (Kick)"
-          elif entry.action == discord.AuditLogAction.ban:
-            action_title = "🔨 حظر (Ban)"
+          # 1. عقوبات الباند (Ban)
+          if entry.action == discord.AuditLogAction.ban:
+            bans.append(f"🔨 **المسؤول:** {moderator.mention}\n📝 **السبب:** {reason}")
+
+          # 2. عقوبات التايم أوت (Timeout)
           elif entry.action == discord.AuditLogAction.member_update:
             if entry.after and getattr(
                 entry.after, "communication_disabled_until", None
             ):
-              action_title = "🔇 تايم أوت (Timeout)"
+              timeout_until = entry.after.communication_disabled_until
+              timeouts.append(
+                  f"🔇 **المسؤول:** {moderator.mention}\n⏳ **حتى تاريخ/وقت:** {timeout_until.strftime('%Y-%m-%d %H:%M')}\n📝 **السبب:** {reason}"
+              )
+
+          # 3. عقوبات الكيك (Kick)
+          elif entry.action == discord.AuditLogAction.kick:
+            kicks.append(f"🦵 **المسؤول:** {moderator.mention}\n📝 **السبب:** {reason}")
+
+          # 4. عقوبات السجن أو التحذيرات عبر تعديل الرتب
           elif entry.action == discord.AuditLogAction.member_role_update:
-            if entry.after and getattr(entry.after, "roles", None):
+            if entry.after and hasattr(entry.after, "roles") and entry.after.roles:
               role_names = [r.name for r in entry.after.roles]
+              
+              # فحص السجن
               if PRISON_ROLE_NAME in role_names:
-                action_title = "⛓️ سجن (Prison)"
-              elif any(
-                  r in role_names
-                  for r in [
-                      WARN_ROLE_1_NAME,
-                      WARN_ROLE_2_NAME,
-                      WARN_ROLE_3_NAME,
-                  ]
-              ):
-                action_title = "⚠️ رتبة تحذير / إدارية"
+                prisons.append(f"⛓️ **المسؤول:** {moderator.mention}\n📝 **السبب:** {reason}")
+              
+              # فحص التحذيرات
+              for r_name in [WARN_ROLE_1_NAME, WARN_ROLE_2_NAME, WARN_ROLE_3_NAME]:
+                if r_name in role_names:
+                  warns.append(f"⚠️ **المسؤول:** {moderator.mention} (الرتبة: {r_name})\n📝 **السبب:** {reason}")
 
-          if action_title:
-            embed.add_field(
-                name=action_title,
-                value=f"📝 **التفاصيل:** {reason_text}",
-                inline=False,
-            )
-            actions_found += 1
+      # إضافة الحقول بترتيبك المطلوبة (باند ➔ تايم أوت ➔ سجن ➔ كيك ➔ تحذير)
+      if bans:
+        embed.add_field(name="🔨 سجل الباند (Ban)", value="\n\n".join(bans[:5]), inline=False)
+      
+      if timeouts:
+        embed.add_field(name="🔇 سجل التايم أوت (Timeout)", value="\n\n".join(timeouts[:5]), inline=False)
+      
+      if prisons:
+        embed.add_field(name="⛓️ سجل السجن (Prison)", value="\n\n".join(prisons[:5]), inline=False)
+      
+      if kicks:
+        embed.add_field(name="🦵 سجل الكيك (Kick)", value="\n\n".join(kicks[:5]), inline=False)
+        
+      if warns:
+        embed.add_field(name="⚠️ سجل التحذيرات (Warns)", value="\n\n".join(warns[:5]), inline=False)
 
-      if actions_found == 0:
-        embed.description = (
-            "لا توجد سجلات عقوبات حديثة مسجلة لهذا العضو في سجل السيرفر الرسمي."
-        )
+      if not (bans or timeouts or prisons or kicks or warns):
+        embed.description = "❌ لا توجد أي سجلات عقوبات مسجلة لهذا العضو في السيرفر حتى الآن."
 
       await interaction.followup.send(embed=embed, ephemeral=True)
 
