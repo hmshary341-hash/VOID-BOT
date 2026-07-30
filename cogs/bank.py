@@ -3,7 +3,6 @@ import json
 import os
 import random
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 os.makedirs("/app/data", exist_ok=True)
@@ -71,47 +70,38 @@ class Bank(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-  # تعريف مجموعة أوامر البنك والاقتصاد الرئيسية
-  economy = app_commands.Group(
-      name="economy", description="أوامر البنك والاقتصاد والترتيب"
-  )
-
-  async def check_channel(self, interaction: discord.Interaction) -> bool:
-    if interaction.channel.id != BANK_CHANNEL_ID:
-      await interaction.response.send_message(
-          f"❌ عذراً، يمكنك استخدام أوامر البنك فقط في روم <#{BANK_CHANNEL_ID}>!",
-          ephemeral=True,
+  async def check_channel(self, ctx) -> bool:
+    if ctx.channel.id != BANK_CHANNEL_ID:
+      await ctx.send(
+          f"❌ عذراً، يمكنك استخدام أوامر البنك والاقتصاد فقط في روم"
+          f" <#{BANK_CHANNEL_ID}> ولا يمكن استخدامها هنا نهائياً!"
       )
       return False
     return True
 
-  @economy.command(name="balance", description="معرفة رصيدك البنكي الحالي")
-  async def balance(self, interaction: discord.Interaction):
-    if not await self.check_channel(interaction):
+  @commands.command(name="رصيدي_البنكي", aliases=["رصيدي البنكي"])
+  async def balance(self, ctx):
+    if not await self.check_channel(ctx):
       return
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, ctx.author.id)
     coins = user_data["coins"]
-    await interaction.response.send_message(
-        f"🏦 رصيدك في البنك هو: **{coins:,} كوينز**", ephemeral=True
-    )
+    await ctx.send(f"🏦 رصيدك في البنك هو: **{coins:,} كوينز**")
 
-  @economy.command(
-      name="daily",
-      description="الحصول على جائزتك اليومية من الكوينز (مرة كل يوم)",
+  @commands.command(
+      name="استلام_الضمان_اليومي",
+      aliases=["أستلام الضمان اليومي", "استلام الضمان اليومي"],
   )
-  async def daily(self, interaction: discord.Interaction):
-    if not await self.check_channel(interaction):
+  async def daily(self, ctx):
+    if not await self.check_channel(ctx):
       return
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, ctx.author.id)
 
     today_str = str(datetime.date.today())
     if user_data.get("last_daily_date") == today_str:
-      await interaction.response.send_message(
-          "❌ لقد استلمت جائزتك اليومية بالفعل اليوم! يمكنك استلامها مرة أخرى"
-          " غداً.",
-          ephemeral=True,
+      await ctx.send(
+          "❌ لقد استلمت جائزتك اليومية بالفعل اليوم! يمكنك استلامها مرة أخرى غداً."
       )
       return
 
@@ -120,26 +110,24 @@ class Bank(commands.Cog):
     user_data["last_daily_date"] = today_str
     save_data(data)
 
-    await interaction.response.send_message(
+    await ctx.send(
         f"🎉 لقد استلمت جائزتك اليومية بنجاح! تم إضافة **{reward:,} كوينز** إلى"
-        " رصيدك البنكي.",
-        ephemeral=True,
+        " رصيدك البنكي."
     )
 
-  @economy.command(
-      name="work", description="العمل لكسب بعض الكوينز في البنك (مرة كل يوم)"
+  @commands.command(
+      name="استلام_راتبي", aliases=["أستلام راتبي", "استلام راتبي"]
   )
-  async def work(self, interaction: discord.Interaction):
-    if not await self.check_channel(interaction):
+  async def work(self, ctx):
+    if not await self.check_channel(ctx):
       return
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, ctx.author.id)
 
     today_str = str(datetime.date.today())
     if user_data.get("last_work_date") == today_str:
-      await interaction.response.send_message(
-          "❌ لقد قمت بالعمل بالفعل اليوم! يمكنك العمل مرة أخرى غداً.",
-          ephemeral=True,
+      await ctx.send(
+          "❌ لقد قمت بالعمل بالفعل اليوم! يمكنك العمل مرة أخرى غداً."
       )
       return
 
@@ -148,56 +136,51 @@ class Bank(commands.Cog):
     user_data["last_work_date"] = today_str
     save_data(data)
 
-    await interaction.response.send_message(
-        f"🛠️ عملت بجد وربحت **{earned:,} كوينز** أضيفت لحسابك البنكي!",
-        ephemeral=True,
+    await ctx.send(
+        f"🛠️ عملت بجد وربحت **{earned:,} كوينز** أضيفت لحسابك البنكي!"
     )
 
-  @economy.command(name="coinflip", description="لعبة مراهنة البنك: لا محدودة")
-  @app_commands.describe(amount="عدد الكوينز التي تريد المراهنة بها")
-  async def coinflip(self, interaction: discord.Interaction, amount: int):
-    if not await self.check_channel(interaction):
+  @commands.command(name="حظ")
+  async def coinflip(self, ctx, amount: int = None):
+    if not await self.check_channel(ctx):
       return
+    if amount is None:
+      await ctx.send("❌ يرجى تحديد المبلغ المراد المراهنة به! مثال: `-حظ 500`")
+      return
+
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, ctx.author.id)
     current_balance = user_data["coins"]
 
     if amount <= 0:
-      await interaction.response.send_message(
-          "❌ يجب أن تكون المراهنة أكبر من الصفر!", ephemeral=True
-      )
+      await ctx.send("❌ يجب أن تكون المراهنة أكبر من الصفر!")
       return
 
     if current_balance < amount:
-      await interaction.response.send_message(
-          "❌ ليس لديك رصيد كافٍ في البنك لهذه المراهنة!", ephemeral=True
-      )
+      await ctx.send("❌ ليس لديك رصيد كافٍ في البنك لهذه المراهنة!")
       return
 
     if random.choice([True, False]):
       user_data["coins"] += amount
       save_data(data)
-      await interaction.response.send_message(
+      await ctx.send(
           f"🎉 مبروك! فزت بالرهان وضاعفت مبلغك. ربحت **{amount:,} كوينز**! رصيدك"
           f" الجديد: **{user_data['coins']:,} كوينز**"
       )
     else:
       user_data["coins"] -= amount
       save_data(data)
-      await interaction.response.send_message(
+      await ctx.send(
           f"😢 للأسف خسرت الرهان وخسرت **{amount:,} كوينز**. رصيدك الجديد:"
           f" **{user_data['coins']:,} كوينز**"
       )
 
-  @economy.command(
-      name="nerd",
-      description="لعبة نرد البنك: مكافآت عشوائية (متاحة مرتين فقط في اليوم)",
-  )
-  async def nerd(self, interaction: discord.Interaction):
-    if not await self.check_channel(interaction):
+  @commands.command(name="نرد")
+  async def nerd(self, ctx):
+    if not await self.check_channel(ctx):
       return
     data = load_data()
-    user_data = get_user_data(data, interaction.user.id)
+    user_data = get_user_data(data, ctx.author.id)
 
     today_str = str(datetime.date.today())
     if user_data.get("last_nerd_date") != today_str:
@@ -206,10 +189,9 @@ class Bank(commands.Cog):
 
     MAX_NERD_LIMIT = 2
     if user_data["nerd_count"] >= MAX_NERD_LIMIT:
-      await interaction.response.send_message(
+      await ctx.send(
           "❌ لقد استهلكت محاولاتك لـ (النرد) لهذا اليوم (مرتان فقط). تجدد"
-          " المحاولات غداً!",
-          ephemeral=True,
+          " المحاولات غداً!"
       )
       return
 
@@ -223,49 +205,44 @@ class Bank(commands.Cog):
 
     remaining_attempts = MAX_NERD_LIMIT - user_data["nerd_count"]
     if reward > 0:
-      await interaction.response.send_message(
+      await ctx.send(
           f"🎲 رميت النرد وحالفك الحظ! ربحت **{reward:,} كوينز**.\n🏦 رصيدك الجديد:"
           f" **{user_data['coins']:,} كوينز**\n📌 المحاولات المتبقية لك اليوم:"
           f" {remaining_attempts}"
       )
     else:
-      await interaction.response.send_message(
+      await ctx.send(
           "🎲 رميت النرد وللأسف جاء الحظ صفيراً (0 كوينز).\n🏦 رصيدك الحالي:"
           f" **{user_data['coins']:,} كوينز**\n📌 المحاولات المتبقية لك اليوم:"
           f" {remaining_attempts}"
       )
 
-  @economy.command(
-      name="transfer",
-      description="تحويل كوينز لعضو آخر (الحد اليومي 2,000 كوينز)",
-  )
-  @app_commands.describe(
-      member="العضو المراد التحويل إليه", amount="عدد الكوينز"
-  )
-  async def transfer(
-      self, interaction: discord.Interaction, member: discord.Member, amount: int
-  ):
-    if not await self.check_channel(interaction):
+  @commands.command(name="تحويل")
+  async def transfer(self, ctx, member: discord.Member = None, amount: int = None):
+    if not await self.check_channel(ctx):
       return
-    if member.id == interaction.user.id:
-      await interaction.response.send_message(
-          "❌ لا يمكنك تحويل الكوينز لنفسك!", ephemeral=True
+    if member is None or amount is None:
+      await ctx.send(
+          "❌ الاستخدام الصحيح:\n`-تحويل @العضو المبلغ`\nمثال: `-تحويل @فلان"
+          " 500`"
       )
+      return
+
+    if member.id == ctx.author.id:
+      await ctx.send("❌ لا يمكنك تحويل الكوينز لنفسك!")
       return
 
     if amount <= 0:
-      await interaction.response.send_message(
-          "❌ يجب أن يكون المبلغ أكبر من الصفر!", ephemeral=True
-      )
+      await ctx.send("❌ يجب أن يكون المبلغ أكبر من الصفر!")
       return
 
     data = load_data()
-    sender_data = get_user_data(data, interaction.user.id)
+    sender_data = get_user_data(data, ctx.author.id)
     receiver_data = get_user_data(data, member.id)
 
     if sender_data["coins"] < amount:
-      await interaction.response.send_message(
-          "❌ ليس لديك رصيد كافٍ في البنك لإتمام عملية التحويل!", ephemeral=True
+      await ctx.send(
+          "❌ ليس لديك رصيد كافٍ في البنك لإتمام عملية التحويل!"
       )
       return
 
@@ -278,11 +255,10 @@ class Bank(commands.Cog):
 
     if sender_data["daily_transferred"] + amount > MAX_DAILY_LIMIT:
       remaining = MAX_DAILY_LIMIT - sender_data["daily_transferred"]
-      await interaction.response.send_message(
+      await ctx.send(
           "❌ لقد تجاوزت **الحد اليومي** للتحويل في البنك!\nالحد الأقصى:"
           f" **{MAX_DAILY_LIMIT:,} كوينز**\nالمتبقي لك اليوم:"
-          f" **{max(0, remaining):,} كوينز**",
-          ephemeral=True,
+          f" **{max(0, remaining):,} كوينز**"
       )
       return
 
@@ -292,36 +268,32 @@ class Bank(commands.Cog):
 
     save_data(data)
 
-    await interaction.response.send_message(
+    await ctx.send(
         f"✅ تم تحويل **{amount:,} كوينز** بنجاح إلى العضو {member.mention} عبر"
         f" البنك!\n📊 ما تم تحويله اليوم:"
-        f" **{sender_data['daily_transferred']:,} / {MAX_DAILY_LIMIT:,} كوينز**",
-        ephemeral=True,
+        f" **{sender_data['daily_transferred']:,} / {MAX_DAILY_LIMIT:,} كوينز**"
     )
 
-  @economy.command(
-      name="add_coins",
-      description="أمر خاص بمالك السيرفر لإضافة كوينز لأي شخص",
-  )
-  @app_commands.describe(
-      member="العضو المراد إعطاؤه الكوينز", amount="عدد الكوينز المراد إضافتها"
-  )
+  @commands.command(name="إضافة_كوينز", aliases=["إضافة كوينز"])
   async def add_coins(
-      self, interaction: discord.Interaction, member: discord.Member, amount: int
+      self, ctx, member: discord.Member = None, amount: int = None
   ):
-    if not await self.check_channel(interaction):
+    if not await self.check_channel(ctx):
       return
 
-    if interaction.user.id != interaction.guild.owner_id:
-      await interaction.response.send_message(
-          "❌ هذا الأمر مخصص لمالك السيرفر وحدك!", ephemeral=True
+    if ctx.author.id != ctx.guild.owner_id:
+      await ctx.send("❌ هذا الأمر مخصص لمالك السيرفر وحدك!")
+      return
+
+    if member is None or amount is None:
+      await ctx.send(
+          "❌ الاستخدام الصحيح:\n`-إضافة كوينز @العضو المبلغ`\nمثال: `-إضافة"
+          " كوينز @فلان 1000`"
       )
       return
 
     if amount <= 0:
-      await interaction.response.send_message(
-          "❌ يجب أن يكون المبلغ أكبر من الصفر!", ephemeral=True
-      )
+      await ctx.send("❌ يجب أن يكون المبلغ أكبر من الصفر!")
       return
 
     data = load_data()
@@ -330,21 +302,18 @@ class Bank(commands.Cog):
     target_data["coins"] += amount
     save_data(data)
 
-    await interaction.response.send_message(
+    await ctx.send(
         f"✅ تم إضافة **{amount:,} كوينز** إلى رصيد العضو {member.mention}"
-        f" بنجاح!\n🏦 رصيده الجديد: **{target_data['coins']:,} كوينز**",
-        ephemeral=True,
+        f" بنجاح!\n🏦 رصيده الجديد: **{target_data['coins']:,} كوينز**"
     )
 
-  @economy.command(name="top", description="عرض قائمة أغنى الأعضاء في البنك")
-  async def top(self, interaction: discord.Interaction):
-    if not await self.check_channel(interaction):
+  @commands.command(name="توب")
+  async def top(self, ctx):
+    if not await self.check_channel(ctx):
       return
     data = load_data()
     if not data:
-      await interaction.response.send_message(
-          "❌ لا توجد بيانات أعضاء مسجلة في البنك حتى الآن!", ephemeral=True
-      )
+      await ctx.send("❌ لا توجد بيانات أعضاء مسجلة في البنك حتى الآن!")
       return
 
     sorted_users = sorted(
@@ -365,7 +334,7 @@ class Bank(commands.Cog):
         description=description if description else "لا توجد بيانات.",
         color=discord.Color.gold(),
     )
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await ctx.send(embed=embed)
 
 
 async def setup(bot):
