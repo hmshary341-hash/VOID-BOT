@@ -1,4 +1,4 @@
-import datetime
+Import datetime
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -311,7 +311,7 @@ class Admin(commands.Cog):
   # ==========================================
   # 5. أوامر قفل وفتح الشات (Lock & Unlock)
   # ==========================================
-  @app_commands.command(
+  @admin.command(
       name="قفل", description="قفل الشات الحالي لمنع الأعضاء من الكتابة"
   )
   @admin_only()
@@ -331,7 +331,7 @@ class Admin(commands.Cog):
           f"❌ حدث خطأ أثناء قفل القناة: `{e}`", ephemeral=True
       )
 
-  @app_commands.command(
+  @admin.command(
       name="فتح", description="فتح الشات الحالي والسماح للأعضاء بالكتابة"
   )
   @admin_only()
@@ -497,3 +497,4 @@ class Admin(commands.Cog):
 
 async def setup(bot):
   await bot.add_cog(Admin(bot))
+ 
